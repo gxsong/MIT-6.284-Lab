@@ -56,15 +56,12 @@ func Worker(mapf func(string, string) []KeyValue,
 		}
 
 		taskType, TaskID := getTaskReply.TaskType, getTaskReply.TaskID
-		if TaskID == 1 {
-			continue
-		}
 		updateTaskStateArgs, updateTaskStateReply := UpdateTaskStateArgs{}, UpdateTaskStateReply{}
 		updateTaskStateArgs.TaskType, updateTaskStateArgs.TaskID = taskType, TaskID
 
 		switch taskType {
 		case MAP:
-			log.Printf("got %s task on with id %d with input %s", taskType, TaskID, getTaskReply.InputFileNames[0])
+			log.Printf("got %s task on with id %d with input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
 			runMap()
 			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
 			if !ok {
