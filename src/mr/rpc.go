@@ -49,14 +49,15 @@ type GetTaskArgs struct {
 // GetTaskReply ...
 type GetTaskReply struct {
 	TaskType        TaskType
-	WorkerID        int // assigned by master, to be passed in the req of UpdateMapTaskState
+	TaskID          int // assigned by master, to be passed in the req of UpdateMapTaskState
 	InputFileNames  []string
 	OutputFileNames []string
 }
 
 // UpdateTaskStateArgs ...
 type UpdateTaskStateArgs struct {
-	WorkerID  int
+	TaskType  TaskType
+	TaskID    int
 	WorkerErr error // error encountered by the worker when executing mapper task
 }
 

@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"log"
 	"net/rpc"
+	"time"
 )
 
 //
@@ -25,6 +26,18 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
+// TODO: implement me!
+// stub for map work
+func runMap() {
+	log.Println("Map stub run")
+}
+
+// TODO: implement me!
+// stub for reduce work
+func runReduce() {
+	log.Println("reduce stub run")
+}
+
 //
 // main/mrworker.go calls this function.
 //
@@ -32,18 +45,30 @@ func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 
 	for {
-		// TODO: call master.getTask
-		getTaskArgs := GetTaskArgs{}
-		getTaskReply := GetTaskReply{}
-		fmt.Println("Worker calling Master.GetTask")
+		// get task from master
+		getTaskArgs, getTaskReply := GetTaskArgs{}, GetTaskReply{}
+		log.Println("Worker calling Master.GetTask")
+		// TODO: add error handling
 		call("Master.GetTask", &getTaskArgs, &getTaskReply)
-		// TODO: switch on getTaskReply.taskType, cases "MAP" "REDUCE" "EXIT"
-		taskType := getTaskReply.TaskType
+
+		taskType, TaskID := getTaskReply.TaskType, getTaskReply.TaskID
+
+		updateTaskStateArgs, updateTaskStateReply := UpdateTaskStateArgs{}, UpdateTaskStateReply{}
+		updateTaskStateArgs.TaskType, updateTaskStateArgs.TaskID = taskType, TaskID
+
 		switch taskType {
 		case MAP:
-			log.Printf("got %s task.", taskType)
+			log.Printf("got %s task on with id %d with input %s", taskType, TaskID, getTaskReply.InputFileNames[0])
+			runMap()
+			// TODO: add errror handling
+			call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			log.Printf("updated %s task on with id %d.", taskType, TaskID)
 		case REDUCE:
-			log.Printf("got %s task.", taskType)
+			log.Printf("got %s task on with id %d.", taskType, TaskID)
+			runReduce()
+			// TODO: add errror handling
+			call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			log.Printf("updated %s task on with id %d.", taskType, TaskID)
 		case EXIT:
 			log.Printf("got %s task.", taskType)
 			return
@@ -51,12 +76,8 @@ func Worker(mapf func(string, string) []KeyValue,
 			log.Fatalf("bad task type: %s.", taskType)
 			return
 		}
-
+		time.Sleep(time.Second * 3)
 	}
-
-	// uncomment to send the Example RPC to the master.
-	fmt.Println("calling server")
-	CallExample()
 
 }
 
