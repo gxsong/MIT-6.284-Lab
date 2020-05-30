@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -11,7 +12,7 @@ import (
 	"time"
 )
 
-const numMapTask = 3
+const numMapTask = 8
 
 type taskState int
 
@@ -51,87 +52,92 @@ type Master struct {
 	originalInputFiles []string
 	intermediateFiles  []string
 	outputFiles        []string
-	mapTasksToDo       taskMap
-	reduceTasksToDo    taskMap
+	tasksToDo          map[TaskType]*taskMap
 }
 
 // helper functions goes here
 
 func (m *Master) isDone(taskType TaskType) bool {
-	var tasks map[int]*task
-	switch taskType {
-	case MAP:
-		m.mapTasksToDo.mutex.Lock()
-		defer m.mapTasksToDo.mutex.Unlock()
-		tasks = m.mapTasksToDo.tasks
-		for _, t := range tasks {
-			if t.state != UPDATED {
-				log.Printf("checking if mapping is done: found taskID %d is not: %s", t.taskID, t.state)
-				return false
-			}
-		}
-		return true
-	case REDUCE:
-		// TODO: similar as above
-		return false
-	default:
+	if taskType != MAP && taskType != REDUCE {
 		log.Fatalf("bad task type: %s.", taskType)
 		return false
 	}
+	tMap := m.tasksToDo[taskType]
+	tMap.mutex.Lock()
+	defer tMap.mutex.Unlock()
+	tasks := tMap.tasks
+	for _, t := range tasks {
+		if t.state != UPDATED {
+			log.Printf("checking if mapping is done: found taskID %d is not: %s", t.taskID, t.state)
+			return false
+		}
+	}
+	return true
 }
 
 func (m *Master) waitAndSetTaskDone(taskID int, taskType TaskType) error {
-	// TODO: wait for 10 secs to see if tasks is done,
-	// if yes, set task to done, else return error
+	if taskType != MAP && taskType != REDUCE {
+		return errors.New("bad task type: " + string(taskType))
+	}
 	// NOTE: don't lock before waiting for 10 sec
 	time.Sleep(time.Second * 10)
-	switch taskType {
-	case MAP:
-		m.mapTasksToDo.mutex.Lock()
-		log.Printf("checking taskID %d is done: %s", taskID, m.mapTasksToDo.tasks[taskID].state)
-		if m.mapTasksToDo.tasks[taskID].state != UPDATED {
-			m.mapTasksToDo.tasks[taskID].state = CREATED
-		}
-		m.mapTasksToDo.mutex.Unlock()
-	case REDUCE:
-		m.reduceTasksToDo.mutex.Lock()
-		log.Printf("dummy lock on task map")
-		m.reduceTasksToDo.mutex.Unlock()
-	}
 
+	tMap := m.tasksToDo[taskType]
+	tMap.mutex.Lock()
+	defer tMap.mutex.Unlock()
+	log.Printf("waiting for task %d to be done: %s", taskID, tMap.tasks[taskID].state)
+	if tMap.tasks[taskID].state != UPDATED {
+		tMap.tasks[taskID].state = CREATED
+	}
 	return nil
+}
+
+func (m *Master) findToDoTask(tMap *taskMap) (taskID int, t *task) {
+	tMap.mutex.Lock()
+	defer tMap.mutex.Unlock()
+	for taskID, t = range tMap.tasks {
+		if t.state == CREATED {
+			return taskID, t
+		}
+	}
+	return -1, nil
+}
+
+func (m *Master) assignTask(taskType TaskType, reply *GetTaskReply) {
+	tMap := m.tasksToDo[taskType]
+	// find a task that hasn't been done
+	var taskID int
+	var t *task
+	for {
+		taskID, t = m.findToDoTask(tMap)
+		if taskID != -1 && t != nil {
+			break
+		}
+	}
+	tMap.mutex.Lock()
+	// populate response
+	reply.TaskID = taskID
+	reply.TaskType = taskType // TODO: change it accordingly
+	// TODO: assign files
+	reply.InputFileNames = t.inputFileNames
+	log.Printf("Assigning %s task %d, state is %s.", reply.TaskType, reply.TaskID, t.state)
+
+	t.state = ASSIGNED
+	tMap.mutex.Unlock()
+	go m.waitAndSetTaskDone(taskID, reply.TaskType)
 }
 
 // Your code here -- RPC handlers for the worker to call.
 
 // GetTask ...
 func (m *Master) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
-
-	// TODO: assign task with reply fields. only assign reduce task if all map tasks finished.
-
 	if !m.isDone(MAP) {
 		// assign map task
 		log.Println("Master.GetTask called")
-		m.mapTasksToDo.mutex.Lock()
-		// find a task that hasn't been done
-		var taskID int
-		var t *task
-		for taskID, t = range m.mapTasksToDo.tasks {
-			if t.state == CREATED {
-				break
-			}
-		}
-		reply.TaskID = taskID
-		reply.TaskType = MAP
-		reply.InputFileNames = t.inputFileNames
-		log.Printf("Assigning %s task %d, state is %s.", reply.TaskType, reply.TaskID, t.state)
-		t.state = ASSIGNED
-		m.mapTasksToDo.mutex.Unlock()
-		go m.waitAndSetTaskDone(taskID, reply.TaskType)
-
-	} else if false {
-		// TODO: add REDUCE case
-		// assign reduce task
+		m.assignTask(MAP, reply)
+	} else if !m.isDone(REDUCE) {
+		log.Println("Master.GetTask called")
+		m.assignTask(REDUCE, reply)
 	} else {
 		reply.TaskID = -10000
 		reply.TaskType = EXIT
@@ -142,27 +148,24 @@ func (m *Master) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
 
 // UpdateTaskState ...
 func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskStateReply) error {
-	// TODO: implement handler
 	log.Println("Master.UpdateTaskState called")
 	taskType := args.TaskType
 	taskID := args.TaskID
-	switch taskType {
-	case MAP:
-		log.Printf("Updating %s task %d.", taskType, taskID)
-		m.mapTasksToDo.mutex.Lock()
-		// do not update if state == CREATED,
-		// which means worker has timed out and its state
-		// has been changed from ASSIGNED to CREATED
-		if m.mapTasksToDo.tasks[taskID].state == ASSIGNED {
-			m.mapTasksToDo.tasks[taskID].state = UPDATED
-		}
-		log.Printf("updated taskID %d is done: %s", taskID, m.mapTasksToDo.tasks[taskID].state)
-		m.mapTasksToDo.mutex.Unlock()
-	case REDUCE:
-		log.Printf("Updating %s task %d.", taskType, taskID)
-	default:
+	if taskType != MAP && taskType != REDUCE {
 		log.Fatalf("bad task type: %s.", taskType)
+		return errors.New("bad task type: " + string(taskType))
 	}
+	tMap := m.tasksToDo[taskType]
+	log.Printf("Updating %s task %d.", taskType, taskID)
+	tMap.mutex.Lock()
+	// do not update if state == CREATED,
+	// which means worker has timed out and its state
+	// has been changed from ASSIGNED to CREATED
+	if tMap.tasks[taskID].state == ASSIGNED {
+		tMap.tasks[taskID].state = UPDATED
+	}
+	log.Printf("updated taskID %d is done: %s", taskID, tMap.tasks[taskID].state)
+	tMap.mutex.Unlock()
 	return nil
 }
 
@@ -211,14 +214,16 @@ func (m *Master) Done() bool {
 //
 func MakeMaster(files []string, nReduce int) *Master {
 	m := Master{}
-	m.numMapTask = numMapTask
+	m.numMapTask = len(files)
 	m.numReduceTask = nReduce
+	m.tasksToDo = map[TaskType]*taskMap{MAP: new(taskMap), REDUCE: new(taskMap)}
 	// TODO: prepare input files as tasks to be assigned to mappers, populate m.mapTasksToDo
 	// NOTE: # of mapper tasks = # of split files. suppose the pg-xxx.txt files are already split
-	m.mapTasksToDo.tasks = make(map[int]*task)
+	mapTasks := make(map[int]*task)
 	for i := 0; i < m.numMapTask; i++ {
-		m.mapTasksToDo.tasks[i] = &task{i, CREATED, []string{"sample in"}, []string{"sample out"}}
+		mapTasks[i] = &task{i, CREATED, []string{"sample in"}, []string{"sample out"}}
 	}
+	m.tasksToDo[MAP].tasks = mapTasks
 	// TODO: use a for loop to wait for all map done, then prepare reduce tasks, similar to mapper tasks as above
 	m.server()
 	return &m

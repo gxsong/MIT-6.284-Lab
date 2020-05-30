@@ -49,10 +49,16 @@ func Worker(mapf func(string, string) []KeyValue,
 		getTaskArgs, getTaskReply := GetTaskArgs{}, GetTaskReply{}
 		log.Println("Worker calling Master.GetTask")
 		// TODO: add error handling
-		call("Master.GetTask", &getTaskArgs, &getTaskReply)
+		ok := call("Master.GetTask", &getTaskArgs, &getTaskReply)
+		if !ok {
+			log.Fatalf("Failed calling Master.GetTask.")
+			continue
+		}
 
 		taskType, TaskID := getTaskReply.TaskType, getTaskReply.TaskID
-
+		if TaskID == 1 {
+			continue
+		}
 		updateTaskStateArgs, updateTaskStateReply := UpdateTaskStateArgs{}, UpdateTaskStateReply{}
 		updateTaskStateArgs.TaskType, updateTaskStateArgs.TaskID = taskType, TaskID
 
@@ -60,14 +66,20 @@ func Worker(mapf func(string, string) []KeyValue,
 		case MAP:
 			log.Printf("got %s task on with id %d with input %s", taskType, TaskID, getTaskReply.InputFileNames[0])
 			runMap()
-			// TODO: add errror handling
-			call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			if !ok {
+				log.Fatalf("Failed calling Master.UpdateTaskState.")
+				break
+			}
 			log.Printf("updated %s task on with id %d.", taskType, TaskID)
 		case REDUCE:
 			log.Printf("got %s task on with id %d.", taskType, TaskID)
 			runReduce()
-			// TODO: add errror handling
-			call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			if !ok {
+				log.Fatalf("Failed calling Master.UpdateTaskState.")
+				break
+			}
 			log.Printf("updated %s task on with id %d.", taskType, TaskID)
 		case EXIT:
 			log.Printf("got %s task.", taskType)
