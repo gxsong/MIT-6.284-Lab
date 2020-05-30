@@ -33,8 +33,25 @@ func Worker(mapf func(string, string) []KeyValue,
 
 	for {
 		// TODO: call master.getTask
-
+		getTaskArgs := GetTaskArgs{}
+		getTaskReply := GetTaskReply{}
+		fmt.Println("Worker calling Master.GetTask")
+		call("Master.GetTask", &getTaskArgs, &getTaskReply)
 		// TODO: switch on getTaskReply.taskType, cases "MAP" "REDUCE" "EXIT"
+		taskType := getTaskReply.TaskType
+		switch taskType {
+		case MAP:
+			log.Printf("got %s task.", taskType)
+		case REDUCE:
+			log.Printf("got %s task.", taskType)
+		case EXIT:
+			log.Printf("got %s task.", taskType)
+			return
+		default:
+			log.Fatalf("bad task type: %s.", taskType)
+			return
+		}
+
 	}
 
 	// uncomment to send the Example RPC to the master.

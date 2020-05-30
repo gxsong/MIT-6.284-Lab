@@ -51,13 +51,16 @@ type Master struct {
 // Your code here -- RPC handlers for the worker to call.
 
 // GetTask ...
-func GetTask(args *GetTaskArgs, reply *GetTaskReply) {
-	// TODO: implement handler
+func (m *Master) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
+	log.Println("Master.GetTask called")
+	reply.TaskType = EXIT
+	return nil
 }
 
 // UpdateTaskState ...
-func UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskStateReply) {
+func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskStateReply) error {
 	// TODO: implement handler
+	return nil
 }
 
 //

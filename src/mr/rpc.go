@@ -11,6 +11,20 @@ import (
 	"strconv"
 )
 
+// TaskType ...
+type TaskType int
+
+// documentation Place Holder
+const (
+	MAP TaskType = iota
+	REDUCE
+	EXIT
+)
+
+func (t TaskType) String() string {
+	return []string{"MAP", "REDUCE", "EXIT"}[t]
+}
+
 //
 // example to show how to declare the arguments
 // and reply for an RPC.
@@ -34,22 +48,20 @@ type GetTaskArgs struct {
 
 // GetTaskReply ...
 type GetTaskReply struct {
-	workerType      string // can only be "MAP" or "REDUCE" or "EXIT"
-	workerID        int    // assigned by master, to be passed in the req of UpdateMapTaskState
-	inputFileNames  []string
-	outputFileNames []string
-	err             error
+	TaskType        TaskType
+	WorkerID        int // assigned by master, to be passed in the req of UpdateMapTaskState
+	InputFileNames  []string
+	OutputFileNames []string
 }
 
 // UpdateTaskStateArgs ...
 type UpdateTaskStateArgs struct {
-	workerID  int
-	workerErr error // error encountered by the worker when executing mapper task
+	WorkerID  int
+	WorkerErr error // error encountered by the worker when executing mapper task
 }
 
 // UpdateTaskStateReply ...
 type UpdateTaskStateReply struct {
-	err error
 }
 
 // Cook up a unique-ish UNIX-domain socket name
