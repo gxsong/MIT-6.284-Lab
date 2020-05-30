@@ -48,10 +48,9 @@ func Worker(mapf func(string, string) []KeyValue,
 		// get task from master
 		getTaskArgs, getTaskReply := GetTaskArgs{}, GetTaskReply{}
 		log.Println("Worker calling Master.GetTask")
-		// TODO: add error handling
 		ok := call("Master.GetTask", &getTaskArgs, &getTaskReply)
 		if !ok {
-			log.Fatalf("Failed calling Master.GetTask.")
+			log.Printf("Failed calling Master.GetTask.")
 			continue
 		}
 
@@ -65,7 +64,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			runMap()
 			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
 			if !ok {
-				log.Fatalf("Failed calling Master.UpdateTaskState.")
+				log.Printf("Failed calling Master.UpdateTaskState.")
 				break
 			}
 			log.Printf("updated %s task on with id %d.", taskType, TaskID)
@@ -74,7 +73,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			runReduce()
 			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
 			if !ok {
-				log.Fatalf("Failed calling Master.UpdateTaskState.")
+				log.Printf("Failed calling Master.UpdateTaskState.")
 				break
 			}
 			log.Printf("updated %s task on with id %d.", taskType, TaskID)
@@ -82,7 +81,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			log.Printf("got %s task.", taskType)
 			return
 		default:
-			log.Fatalf("bad task type: %s.", taskType)
+			log.Printf("bad task type: %s.", taskType)
 			return
 		}
 		time.Sleep(time.Second * 3)

@@ -58,7 +58,7 @@ type GetTaskReply struct {
 type UpdateTaskStateArgs struct {
 	TaskType  TaskType
 	TaskID    int
-	WorkerErr error // error encountered by the worker when executing mapper task
+	WorkerErr string // error encountered by the worker when executing mapper task
 }
 
 // UpdateTaskStateReply ...

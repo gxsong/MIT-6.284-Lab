@@ -59,7 +59,7 @@ type Master struct {
 
 func (m *Master) isDone(taskType TaskType) bool {
 	if taskType != MAP && taskType != REDUCE {
-		log.Fatalf("bad task type: %s.", taskType)
+		log.Printf("bad task type: %s.", taskType)
 		return false
 	}
 	tMap := m.tasksToDo[taskType]
@@ -68,7 +68,7 @@ func (m *Master) isDone(taskType TaskType) bool {
 	tasks := tMap.tasks
 	for _, t := range tasks {
 		if t.state != UPDATED {
-			log.Printf("checking if mapping is done: found taskID %d is not: %s", t.taskID, t.state)
+			// log.Printf("checking if mapping is done: found taskID %d is not: %s", t.taskID, t.state)
 			return false
 		}
 	}
@@ -85,9 +85,10 @@ func (m *Master) waitAndSetTaskDone(taskID int, taskType TaskType) error {
 	tMap := m.tasksToDo[taskType]
 	tMap.mutex.Lock()
 	defer tMap.mutex.Unlock()
-	log.Printf("waiting for task %d to be done: %s", taskID, tMap.tasks[taskID].state)
+	log.Printf("Waiting for %s task %d to be done: %s...", taskType, taskID, tMap.tasks[taskID].state)
 	if tMap.tasks[taskID].state != UPDATED {
 		tMap.tasks[taskID].state = CREATED
+		log.Printf("%s task %d timed out, will be reassigned to others", taskType, taskID)
 	}
 	return nil
 }
@@ -151,9 +152,10 @@ func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskSta
 	log.Println("Master.UpdateTaskState called")
 	taskType := args.TaskType
 	taskID := args.TaskID
+	var err error
 	if taskType != MAP && taskType != REDUCE {
-		log.Fatalf("bad task type: %s.", taskType)
-		return errors.New("bad task type: " + string(taskType))
+		log.Printf("bad task type: %s.", taskType)
+		err = errors.New("bad task type")
 	}
 	tMap := m.tasksToDo[taskType]
 	tMap.mutex.Lock()
@@ -161,14 +163,18 @@ func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskSta
 	// which means worker has timed out and its state
 	// has been changed from ASSIGNED to CREATED
 	t := tMap.tasks[taskID]
-	if t.state == ASSIGNED {
+	if args.WorkerErr != "" {
+		t.state = CREATED
+		log.Printf("Got worker err on %s task %d, will be reassigned.", taskType, taskID)
+		err = errors.New("Worker Error")
+	} else if t.state == ASSIGNED {
 		t.state = UPDATED
+		m.intermediateFiles = append(m.intermediateFiles, t.outputFileNames...)
 	}
-	m.intermediateFiles = append(m.intermediateFiles, t.outputFileNames...)
 	tMap.mutex.Unlock()
 	log.Printf("updated taskID %d, state: %s", taskID, tMap.tasks[taskID].state)
 	log.Printf("Intermediate files now are: %s", m.intermediateFiles)
-	return nil
+	return err
 }
 
 //
