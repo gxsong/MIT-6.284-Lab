@@ -64,9 +64,10 @@ func (m *Master) isDone(taskType TaskType) bool {
 	tMap.mutex.Lock()
 	defer tMap.mutex.Unlock()
 	tasks := tMap.tasks
+	log.Printf("checking if %s is done", taskType)
 	for _, t := range tasks {
 		if t.state != UPDATED {
-			// log.Printf("checking if mapping is done: found taskID %d is not: %s", t.taskID, t.state)
+			log.Printf("found taskID %d is not: %s", t.taskID, t.state)
 			return false
 		}
 	}
@@ -83,7 +84,7 @@ func (m *Master) waitAndSetTaskDone(taskID int, taskType TaskType) error {
 	tMap := m.tasksToDo[taskType]
 	tMap.mutex.Lock()
 	defer tMap.mutex.Unlock()
-	log.Printf("Waiting for %s task %d to be done: %s...", taskType, taskID, tMap.tasks[taskID].state)
+	log.Printf("Checking status for %s task %d, %s...", taskType, taskID, tMap.tasks[taskID].state)
 	if tMap.tasks[taskID].state != UPDATED {
 		tMap.tasks[taskID].state = CREATED
 		log.Printf("%s task %d timed out, will be reassigned to others", taskType, taskID)
@@ -116,7 +117,7 @@ func (m *Master) assignTask(taskType TaskType, reply *GetTaskReply) {
 	tMap.mutex.Lock()
 	// populate response
 	reply.TaskID = taskID
-	reply.TaskType = taskType // TODO: change it accordingly
+	reply.TaskType = taskType
 	reply.InputFileNames = t.inputFileNames
 	reply.OutputFileNames = t.outputFileNames
 	log.Printf("Assigning %s task %d, state is %s.", reply.TaskType, reply.TaskID, t.state)
@@ -226,6 +227,19 @@ func (m *Master) getMapInputFiles(taskID int) []string {
 	return []string{m.originalInputFiles[taskID]}
 }
 
+func (m *Master) getReduceInputFiles(taskID int) []string {
+	res := make([]string, m.numMapTask)
+	for i := 0; i < m.numMapTask; i++ {
+		name := fmt.Sprintf("mr-%d-%d", i, taskID)
+		res[i] = name
+	}
+	return res
+}
+
+func (m *Master) getReduceOutputFiles(taskID int) []string {
+	return []string{fmt.Sprintf("mr-out-%d", taskID)}
+}
+
 //
 // create a Master.
 // main/mrmaster.go calls this function.
@@ -237,13 +251,20 @@ func MakeMaster(files []string, nReduce int) *Master {
 	m.numReduceTask = nReduce
 	m.originalInputFiles = files
 	m.tasksToDo = map[TaskType]*taskMap{MAP: new(taskMap), REDUCE: new(taskMap)}
+
 	// NOTE: # of mapper tasks = # of split files. suppose the pg-xxx.txt files are already split
 	mapTasks := make(map[int]*task)
 	for i := 0; i < m.numMapTask; i++ {
 		mapTasks[i] = &task{i, CREATED, m.getMapInputFiles(i), m.getMapOutputFiles(i)}
 	}
 	m.tasksToDo[MAP].tasks = mapTasks
-	// TODO: use a for loop to wait for all map done, then prepare reduce tasks, similar to mapper tasks as above
+
+	reduceTasks := make(map[int]*task)
+	for i := 0; i < m.numReduceTask; i++ {
+		reduceTasks[i] = &task{i, CREATED, m.getReduceInputFiles(i), m.getReduceOutputFiles(i)}
+	}
+	m.tasksToDo[REDUCE].tasks = reduceTasks
+
 	m.server()
 	return &m
 }

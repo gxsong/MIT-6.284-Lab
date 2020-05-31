@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/rpc"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -19,6 +20,14 @@ type KeyValue struct {
 	Value string
 }
 
+// for sorting by key.
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
+
 //
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
@@ -29,15 +38,15 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-func readInput(filename string) (string, error) {
-	file, err := os.Open(filename)
+func readMapInput(inputFileName string) (string, error) {
+	file, err := os.Open(inputFileName)
 	if err != nil {
-		log.Fatalf("cannot open %v", filename)
+		log.Fatalf("cannot open %v", inputFileName)
 		return "", err
 	}
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatalf("cannot read %v", filename)
+		log.Fatalf("cannot read %v", inputFileName)
 		return "", err
 	}
 	file.Close()
@@ -58,25 +67,25 @@ func writeMapOutput(outputFileName string, kvs []KeyValue) error {
 
 // perform map task, note that map task should only have one input file
 func runMap(mapf func(string, string) []KeyValue, inputFileNames []string, outputFileNames []string) error {
-	log.Println("Map stub run")
-	filename := inputFileNames[0]
-	content, err := readInput(inputFileNames[0])
+	log.Println("Map worker is working")
+	inputFileName := inputFileNames[0]
+	content, err := readMapInput(inputFileNames[0])
 	if err != nil {
 		return err
 	}
 
-	kvs := mapf(filename, content)
+	kvs := mapf(inputFileName, content)
 	nOutputPartitions := len(outputFileNames)
 
 	fileKVMap := make(map[string][]KeyValue)
 	for _, kv := range kvs {
 		hash := ihash(kv.Key) % nOutputPartitions
-		filename := outputFileNames[hash]
-		fileKVMap[filename] = append(fileKVMap[filename], kv)
+		outputFileName := outputFileNames[hash]
+		fileKVMap[outputFileName] = append(fileKVMap[outputFileName], kv)
 	}
 
-	for filename, kvs := range fileKVMap {
-		err := writeMapOutput(filename, kvs)
+	for outputFileName, kvs := range fileKVMap {
+		err := writeMapOutput(outputFileName, kvs)
 		if err != nil {
 			return err
 		}
@@ -84,11 +93,64 @@ func runMap(mapf func(string, string) []KeyValue, inputFileNames []string, outpu
 	return nil
 }
 
-// TODO: implement me!
-// stub for reduce work
-func runReduce() bool {
-	log.Println("reduce stub run")
-	return true
+func readReduceInput(inputFileName string) ([]KeyValue, error) {
+	kvs := []KeyValue{}
+	file, _ := os.Open(inputFileName)
+	dec := json.NewDecoder(file)
+	for {
+		var kv KeyValue
+		if err := dec.Decode(&kv); err != nil {
+			if err.Error() != "EOF" {
+				return kvs, err
+			}
+			return kvs, nil
+		}
+		kvs = append(kvs, kv)
+
+	}
+	return kvs, nil
+}
+
+func writeReduceOutput(outputFileName string, content string) error {
+	file, _ := os.Create(outputFileName)
+	_, err := fmt.Fprintf(file, content)
+	if err != nil {
+		return err
+	}
+	file.Close()
+	return nil
+}
+
+// perform reduce task, note that there is only one output file
+func runReduce(reducef func(string, []string) string, inputFileNames []string, outputFileNames []string) error {
+	log.Println("Reduce worker is working")
+	allKVs := []KeyValue{}
+	for _, inputFileName := range inputFileNames {
+		kvs, err := readReduceInput(inputFileName)
+		if err != nil {
+			return err
+		}
+		allKVs = append(allKVs, kvs...)
+	}
+	sort.Sort(ByKey(allKVs))
+	content := ""
+	i := 0
+	for i < len(allKVs) {
+		j := i + 1
+		for j < len(allKVs) && allKVs[j].Key == allKVs[i].Key {
+			j++
+		}
+		values := []string{}
+		for k := i; k < j; k++ {
+			values = append(values, allKVs[k].Value)
+		}
+		res := reducef(allKVs[i].Key, values)
+		content += fmt.Sprintf("%v %v\n", allKVs[i].Key, res)
+
+		i = j
+	}
+	writeReduceOutput(outputFileNames[0], content)
+	return nil
 }
 
 //
@@ -106,7 +168,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			continue
 		}
 
-		taskType, TaskID := getTaskReply.TaskType, getTaskReply.TaskID
+		taskType, TaskID, inputFileNames, outputFileNames := getTaskReply.TaskType, getTaskReply.TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames
 		updateTaskStateArgs, updateTaskStateReply := UpdateTaskStateArgs{}, UpdateTaskStateReply{}
 		updateTaskStateArgs.TaskType, updateTaskStateArgs.TaskID = taskType, TaskID
 
@@ -115,9 +177,9 @@ func Worker(mapf func(string, string) []KeyValue,
 			log.Printf("got %s task on with id %d with input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
 			var err error
 			if taskType == MAP {
-				err = runMap(mapf, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
+				err = runMap(mapf, inputFileNames, outputFileNames)
 			} else if taskType == REDUCE {
-				runReduce()
+				err = runReduce(reducef, inputFileNames, outputFileNames)
 			}
 			if err != nil {
 				updateTaskStateArgs.WorkerErr = err
