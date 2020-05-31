@@ -41,12 +41,10 @@ func ihash(key string) int {
 func readMapInput(inputFileName string) (string, error) {
 	file, err := os.Open(inputFileName)
 	if err != nil {
-		log.Fatalf("cannot open %v", inputFileName)
 		return "", err
 	}
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatalf("cannot read %v", inputFileName)
 		return "", err
 	}
 	file.Close()
@@ -174,7 +172,7 @@ func Worker(mapf func(string, string) []KeyValue,
 
 		switch taskType {
 		case MAP, REDUCE:
-			log.Printf("got %s task on with id %d with input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
+			log.Printf("got %s task on with id %d, input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
 			var err error
 			if taskType == MAP {
 				err = runMap(mapf, inputFileNames, outputFileNames)
@@ -189,7 +187,7 @@ func Worker(mapf func(string, string) []KeyValue,
 				log.Printf("Failed calling Master.UpdateTaskState.")
 				break
 			}
-			log.Printf("updated %s task on with id %d.", taskType, TaskID)
+			log.Printf("updated %s task with id %d.", taskType, TaskID)
 		case EXIT:
 			log.Printf("got %s task.", taskType)
 			return

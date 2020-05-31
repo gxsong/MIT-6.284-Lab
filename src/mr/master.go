@@ -64,10 +64,8 @@ func (m *Master) isDone(taskType TaskType) bool {
 	tMap.mutex.Lock()
 	defer tMap.mutex.Unlock()
 	tasks := tMap.tasks
-	log.Printf("checking if %s is done", taskType)
 	for _, t := range tasks {
 		if t.state != UPDATED {
-			log.Printf("found taskID %d is not: %s", t.taskID, t.state)
 			return false
 		}
 	}
@@ -84,7 +82,6 @@ func (m *Master) waitAndSetTaskDone(taskID int, taskType TaskType) error {
 	tMap := m.tasksToDo[taskType]
 	tMap.mutex.Lock()
 	defer tMap.mutex.Unlock()
-	log.Printf("Checking status for %s task %d, %s...", taskType, taskID, tMap.tasks[taskID].state)
 	if tMap.tasks[taskID].state != UPDATED {
 		tMap.tasks[taskID].state = CREATED
 		log.Printf("%s task %d timed out, will be reassigned to others", taskType, taskID)
@@ -133,10 +130,8 @@ func (m *Master) assignTask(taskType TaskType, reply *GetTaskReply) {
 func (m *Master) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
 	if !m.isDone(MAP) {
 		// assign map task
-		log.Println("Master.GetTask called")
 		m.assignTask(MAP, reply)
 	} else if !m.isDone(REDUCE) {
-		log.Println("Master.GetTask called")
 		m.assignTask(REDUCE, reply)
 	} else {
 		reply.TaskID = -10000
@@ -148,7 +143,6 @@ func (m *Master) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
 
 // UpdateTaskState ...
 func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskStateReply) error {
-	log.Println("Master.UpdateTaskState called")
 	taskType := args.TaskType
 	taskID := args.TaskID
 	var err error
@@ -168,11 +162,14 @@ func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskSta
 		err = errors.New("Worker Error")
 	} else if t.state == ASSIGNED {
 		t.state = UPDATED
-		m.intermediateFiles = append(m.intermediateFiles, t.outputFileNames...)
+		if taskType == MAP {
+			m.intermediateFiles = append(m.intermediateFiles, t.outputFileNames...)
+		} else if taskType == REDUCE {
+			m.outputFiles = append(m.outputFiles, t.outputFileNames...)
+		}
 	}
 	tMap.mutex.Unlock()
 	log.Printf("updated taskID %d, state: %s", taskID, tMap.tasks[taskID].state)
-	log.Printf("Intermediate files now are: %s", m.intermediateFiles)
 	return err
 }
 
@@ -210,8 +207,7 @@ func (m *Master) server() {
 // return true if the job has finished, false otherwise
 //
 func (m *Master) Done() bool {
-	return false
-	// return m.isDone(MAP) && m.isDone(REDUCE)
+	return m.isDone(MAP) && m.isDone(REDUCE)
 }
 
 func (m *Master) getMapOutputFiles(taskID int) []string {
