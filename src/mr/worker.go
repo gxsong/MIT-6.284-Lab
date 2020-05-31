@@ -197,7 +197,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			log.Printf("bad task type: %s.", taskType)
 			return
 		}
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second)
 	}
 
 }
