@@ -1,10 +1,13 @@
 package mr
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io/ioutil"
 	"log"
 	"net/rpc"
+	"os"
 	"time"
 )
 
@@ -26,16 +29,66 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-// TODO: implement me!
-// stub for map work
-func runMap() {
+func readInput(filename string) (string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("cannot open %v", filename)
+		return "", err
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatalf("cannot read %v", filename)
+		return "", err
+	}
+	file.Close()
+	return string(content), nil
+}
+
+func writeMapOutput(outputFileName string, kvs []KeyValue) error {
+	file, _ := os.Create(outputFileName)
+	enc := json.NewEncoder(file)
+	for _, kv := range kvs {
+		err := enc.Encode(kv)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// perform map task, note that map task should only have one input file
+func runMap(mapf func(string, string) []KeyValue, inputFileNames []string, outputFileNames []string) error {
 	log.Println("Map stub run")
+	filename := inputFileNames[0]
+	content, err := readInput(inputFileNames[0])
+	if err != nil {
+		return err
+	}
+
+	kvs := mapf(filename, content)
+	nOutputPartitions := len(outputFileNames)
+
+	fileKVMap := make(map[string][]KeyValue)
+	for _, kv := range kvs {
+		hash := ihash(kv.Key) % nOutputPartitions
+		filename := outputFileNames[hash]
+		fileKVMap[filename] = append(fileKVMap[filename], kv)
+	}
+
+	for filename, kvs := range fileKVMap {
+		err := writeMapOutput(filename, kvs)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // TODO: implement me!
 // stub for reduce work
-func runReduce() {
+func runReduce() bool {
 	log.Println("reduce stub run")
+	return true
 }
 
 //
@@ -43,7 +96,6 @@ func runReduce() {
 //
 func Worker(mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
-
 	for {
 		// get task from master
 		getTaskArgs, getTaskReply := GetTaskArgs{}, GetTaskReply{}
@@ -59,18 +111,17 @@ func Worker(mapf func(string, string) []KeyValue,
 		updateTaskStateArgs.TaskType, updateTaskStateArgs.TaskID = taskType, TaskID
 
 		switch taskType {
-		case MAP:
+		case MAP, REDUCE:
 			log.Printf("got %s task on with id %d with input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
-			runMap()
-			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
-			if !ok {
-				log.Printf("Failed calling Master.UpdateTaskState.")
-				break
+			var err error
+			if taskType == MAP {
+				err = runMap(mapf, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
+			} else if taskType == REDUCE {
+				runReduce()
 			}
-			log.Printf("updated %s task on with id %d.", taskType, TaskID)
-		case REDUCE:
-			log.Printf("got %s task on with id %d.", taskType, TaskID)
-			runReduce()
+			if err != nil {
+				updateTaskStateArgs.WorkerErr = err
+			}
 			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
 			if !ok {
 				log.Printf("Failed calling Master.UpdateTaskState.")

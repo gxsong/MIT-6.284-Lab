@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-const numMapTask = 8
-
 type taskState int
 
 // placeholder
@@ -163,7 +161,7 @@ func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskSta
 	// which means worker has timed out and its state
 	// has been changed from ASSIGNED to CREATED
 	t := tMap.tasks[taskID]
-	if args.WorkerErr != "" {
+	if args.WorkerErr != nil {
 		t.state = CREATED
 		log.Printf("Got worker err on %s task %d, will be reassigned.", taskType, taskID)
 		err = errors.New("Worker Error")
