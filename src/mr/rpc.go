@@ -56,9 +56,9 @@ type GetTaskReply struct {
 
 // UpdateTaskStateArgs ...
 type UpdateTaskStateArgs struct {
-	TaskType  TaskType
-	TaskID    int
-	WorkerErr error // error encountered by the worker when executing mapper task
+	TaskType TaskType
+	TaskID   int
+	Ok       bool
 }
 
 // UpdateTaskStateReply ...

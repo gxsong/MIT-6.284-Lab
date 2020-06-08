@@ -8,20 +8,25 @@ package main
 // go build -buildmode=plugin crash.go
 //
 
-import "../mr"
-import crand "crypto/rand"
-import "math/big"
-import "strings"
-import "os"
-import "sort"
-import "strconv"
-import "time"
+import (
+	crand "crypto/rand"
+	"log"
+	"math/big"
+	"os"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"../mr"
+)
 
 func maybeCrash() {
 	max := big.NewInt(1000)
 	rr, _ := crand.Int(crand.Reader, max)
 	if rr.Int64() < 330 {
 		// crash!
+		log.Println("Crash!")
 		os.Exit(1)
 	} else if rr.Int64() < 660 {
 		// delay for a while.
@@ -33,7 +38,7 @@ func maybeCrash() {
 
 func Map(filename string, contents string) []mr.KeyValue {
 	maybeCrash()
-
+	log.Println("Not crash!")
 	kva := []mr.KeyValue{}
 	kva = append(kva, mr.KeyValue{"a", filename})
 	kva = append(kva, mr.KeyValue{"b", strconv.Itoa(len(filename))})
@@ -44,7 +49,7 @@ func Map(filename string, contents string) []mr.KeyValue {
 
 func Reduce(key string, values []string) string {
 	maybeCrash()
-
+	log.Println("Not crash!")
 	// sort values to ensure deterministic output.
 	vv := make([]string, len(values))
 	copy(vv, values)

@@ -41,10 +41,12 @@ func ihash(key string) int {
 func readMapInput(inputFileName string) (string, error) {
 	file, err := os.Open(inputFileName)
 	if err != nil {
+		log.Printf("CHKECK 3")
 		return "", err
 	}
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
+		log.Printf("CHKECK 4")
 		return "", err
 	}
 	file.Close()
@@ -57,6 +59,7 @@ func writeMapOutput(outputFileName string, kvs []KeyValue) error {
 	for _, kv := range kvs {
 		err := enc.Encode(kv)
 		if err != nil {
+			log.Printf("CHKECK 5")
 			return err
 		}
 	}
@@ -69,6 +72,7 @@ func runMap(mapf func(string, string) []KeyValue, inputFileNames []string, outpu
 	inputFileName := inputFileNames[0]
 	content, err := readMapInput(inputFileNames[0])
 	if err != nil {
+		log.Printf("CHKECK 1")
 		return err
 	}
 
@@ -85,6 +89,7 @@ func runMap(mapf func(string, string) []KeyValue, inputFileNames []string, outpu
 	for outputFileName, kvs := range fileKVMap {
 		err := writeMapOutput(outputFileName, kvs)
 		if err != nil {
+			log.Printf("CHKECK 2")
 			return err
 		}
 	}
@@ -106,16 +111,22 @@ func readReduceInput(inputFileName string) ([]KeyValue, error) {
 		kvs = append(kvs, kv)
 
 	}
-	return kvs, nil
 }
 
 func writeReduceOutput(outputFileName string, content string) error {
-	file, _ := os.Create(outputFileName)
-	_, err := fmt.Fprintf(file, content)
+	file, err := ioutil.TempFile(".", fmt.Sprintf("%s-", outputFileName))
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, content)
 	if err != nil {
 		return err
 	}
 	file.Close()
+	err = os.Rename(file.Name(), outputFileName)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -172,7 +183,7 @@ func Worker(mapf func(string, string) []KeyValue,
 
 		switch taskType {
 		case MAP, REDUCE:
-			log.Printf("got %s task on with id %d, input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
+			log.Printf("got %s task with id %d, input %s, output %s", taskType, TaskID, getTaskReply.InputFileNames, getTaskReply.OutputFileNames)
 			var err error
 			if taskType == MAP {
 				err = runMap(mapf, inputFileNames, outputFileNames)
@@ -180,12 +191,14 @@ func Worker(mapf func(string, string) []KeyValue,
 				err = runReduce(reducef, inputFileNames, outputFileNames)
 			}
 			if err != nil {
-				updateTaskStateArgs.WorkerErr = err
+				updateTaskStateArgs.Ok = false
+			} else {
+				updateTaskStateArgs.Ok = true
 			}
-			ok = call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
+			ok := call("Master.UpdateTaskState", &updateTaskStateArgs, &updateTaskStateReply)
 			if !ok {
-				log.Printf("Failed calling Master.UpdateTaskState.")
-				break
+				log.Printf("Failed calling Master.UpdateTask.")
+				continue
 			}
 			log.Printf("updated %s task with id %d.", taskType, TaskID)
 		case EXIT:

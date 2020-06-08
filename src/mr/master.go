@@ -145,10 +145,10 @@ func (m *Master) GetTask(args *GetTaskArgs, reply *GetTaskReply) error {
 func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskStateReply) error {
 	taskType := args.TaskType
 	taskID := args.TaskID
-	var err error
 	if taskType != MAP && taskType != REDUCE {
 		log.Printf("bad task type: %s.", taskType)
-		err = errors.New("bad task type")
+		err := errors.New("bad task type")
+		return err
 	}
 	tMap := m.tasksToDo[taskType]
 	tMap.mutex.Lock()
@@ -156,10 +156,9 @@ func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskSta
 	// which means worker has timed out and its state
 	// has been changed from ASSIGNED to CREATED
 	t := tMap.tasks[taskID]
-	if args.WorkerErr != nil {
+	if !args.Ok {
 		t.state = CREATED
 		log.Printf("Got worker err on %s task %d, will be reassigned.", taskType, taskID)
-		err = errors.New("Worker Error")
 	} else if t.state == ASSIGNED {
 		t.state = UPDATED
 		if taskType == MAP {
@@ -170,7 +169,7 @@ func (m *Master) UpdateTaskState(args *UpdateTaskStateArgs, reply *UpdateTaskSta
 	}
 	tMap.mutex.Unlock()
 	log.Printf("updated taskID %d, state: %s", taskID, tMap.tasks[taskID].state)
-	return err
+	return nil
 }
 
 //
