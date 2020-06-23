@@ -119,6 +119,33 @@ func (rf *Raft) readPersist(data []byte) {
 	// }
 }
 
+type AppendEntriesArgs struct {
+	Term         int
+	LeaderID     int
+	PrevLogIndex int
+	PrevLogTerm  int
+	entries      []LogEntry
+	LeaderCommit int // leader's commit index
+}
+
+type AppendEntriesReply struct {
+	Term    int
+	Success bool
+}
+
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	reply.Term = rf.currentTerm
+	if args.Term < rf.currentTerm {
+		reply.Success = false
+	} else if len(rf.log) <= args.PrevLogIndex || (len(rf.log) > args.PrevLogIndex && rf.log[args.PrevLogIndex].term != args.PrevLogTerm) {
+		reply.Success = false
+	} else {
+		// the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
+		prevLogs := rf.log[:args.PrevLogIndex+1]
+		rf.log = append(prevLogs, args.entries...)
+	}
+}
+
 //
 // example RequestVote RPC arguments structure.
 // field names must start with capital letters!
