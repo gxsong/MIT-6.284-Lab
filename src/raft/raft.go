@@ -285,45 +285,67 @@ func (rf *Raft) killed() bool {
 func (rf *Raft) convertToFollower() bool {
 	rf.persister.SaveRaftState([]byte("FOLLOWER"))
 	log.Printf("Server %d converted to follower.", rf.me)
-	rf.electionTimeOut = false
-	for !rf.electionTimeOut {
-		rf.electionTimeOut = true
-		randNum := (rand.Intn(200) + 500)
+	for {
+		// log.Printf("Server %d started countdonw as %s", rf.me, "FOLLOWER")
+		randNum := (rand.Intn(500) + 500)
 		time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
-		log.Printf("Time elapsed, calling RequestVote from server #%d", rf.me)
+		if rf.electionTimeOut {
+			log.Printf("Time elapsed, server #%d converting to candidate", rf.me)
+			rf.convertToCandidate()
+			return true
+		}
 	}
-	rf.convertToCandidate()
-	return true
+}
+
+func (rf *Raft) startElection() bool {
+	rf.currentTerm++
+	// vote for self
+	rf.votedFor = rf.me
+	rf.electionTimeOut = false
+	lastIdx := len(rf.log) - 1
+	lastTerm := rf.log[lastIdx].Term
+	voteCount := 1
+	for peerID := range rf.peers {
+		if peerID == rf.me {
+			continue
+		}
+		log.Printf("#%d sending request vote to %d", rf.me, peerID)
+		args, reply := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}, RequestVoteReply{}
+		ok := rf.sendRequestVote(peerID, &args, &reply)
+		if !ok {
+			log.Printf("Failed sending RequestVote")
+		}
+		if reply.VoteGranted {
+			voteCount++
+		}
+		rf.electionTimeOut = false
+	}
+	if float64(voteCount) >= float64(len(rf.peers))/2 {
+		log.Printf("Server %d got votes from majority, converting to Leader.", rf.me)
+		return rf.convertToLeader()
+	}
+	return rf.convertToFollower()
 }
 
 func (rf *Raft) convertToCandidate() bool {
 	rf.persister.SaveRaftState([]byte("CANDIDATE"))
 	log.Printf("Server %d converted to candidate.", rf.me)
-	rf.currentTerm++
-	// vote for self
-	rf.votedFor = rf.me
 	// request vote from others
-	lastIdx := len(rf.log) - 1
-	lastTerm := rf.log[lastIdx].Term
-	voteCount := 1
-	for peerID := range rf.peers {
-		log.Printf("#%d sending request vote to %d", rf.me, peerID)
-		args, reply := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}, RequestVoteReply{}
-		go func() {
-			ok := rf.sendRequestVote(peerID, &args, &reply)
-			if !ok {
-				log.Printf("Failed sending RequestVote")
-			}
-		}()
-		if reply.VoteGranted {
-			voteCount++
+
+	for {
+		// log.Printf("Server %d started countdonw as %s", rf.me, "CANDIDAYE")
+		randNum := (rand.Intn(500) + 500)
+		time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
+		if rf.electionTimeOut {
+			log.Printf("Time elapsed, calling RequestVote from server #%d", rf.me)
+			go func() {
+				rf.startElection()
+			}()
+		}
+		if string(rf.persister.ReadRaftState()) != "CANDIDATE" {
+			return true
 		}
 	}
-	if voteCount >= len(rf.peers)/2 {
-		log.Printf("Server %d got votes from majority, converting to Leader.", rf.me)
-		return rf.convertToLeader()
-	}
-	return false
 }
 
 func (rf *Raft) convertToLeader() bool {
@@ -369,9 +391,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.nextIndex = make([]int, 0)
 	rf.matchIndex = make([]int, 0)
 	rf.votedFor = -1
+	rf.log = append(rf.log, LogEntry{Term: 0})
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
-	rf.log = append(rf.log, LogEntry{Term: 0})
+	rf.electionTimeOut = true
 	rf.convertToFollower()
+	state, _ := rf.GetState()
+	log.Printf("Server #%d has state %s.", rf.me, string(state))
 	return rf
 }
