@@ -30,6 +30,14 @@ import (
 // import "bytes"
 // import "../labgob"
 
+type ServerState string
+
+const (
+	FOLLOWER  ServerState = "FOLLOWER"
+	CANDIDATE ServerState = "CANDIDATE"
+	LEADER    ServerState = "LEADER"
+)
+
 //
 // as each Raft peer becomes aware that successive log entries are
 // committed, the peer should send an ApplyMsg to the service (or
@@ -61,6 +69,7 @@ type Raft struct {
 	persister       *Persister          // Object to hold this peer's persisted state
 	me              int                 // this peer's index into peers[]
 	dead            int32               // set by Kill()
+	serverState     ServerState
 	currentTerm     int
 	votedFor        int
 	log             []LogEntry
@@ -79,7 +88,7 @@ type Raft struct {
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
 	// Your code here (2A).
-	return rf.currentTerm, string(rf.persister.ReadRaftState()) == "LEADER"
+	return rf.currentTerm, rf.serverState == LEADER
 }
 
 //
@@ -146,12 +155,15 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		// there doesn't exist an entry in rf.log that has a term consistent with requestor
 		reply.Success = false
 	} else {
+		log.Printf("[Term %d] Server %d Appending entry from %d...", args.Term, rf.me, args.LeaderID)
 		// the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
 		prevLogs := rf.log[:args.PrevLogIndex+1]
 		rf.log = append(prevLogs, args.Entries...)
 		reply.Success = true
-		if string(rf.persister.ReadRaftState()) == "CANDIDATE" {
-			rf.convertToFollower()
+		if rf.serverState != FOLLOWER {
+			go func() {
+				rf.convertToFollower()
+			}()
 		}
 	}
 }
@@ -188,17 +200,25 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
-	log.Printf("Server %d received vote request", rf.me)
+	log.Printf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
 	reply.Term = rf.currentTerm
 	if args.Term < rf.currentTerm { // requestor is stale
 		reply.VoteGranted = false
-	} else if rf.votedFor == -1 || rf.votedFor == args.CandidateID { // see which server's log is more up-to-date
+		return
+	}
+
+	if rf.currentTerm < args.Term {
+		rf.votedFor = -1
+	}
+	if rf.votedFor == -1 || rf.votedFor == args.CandidateID { // see which server's log is more up-to-date
 		lastIdx := len(rf.log) - 1
-		lastTerm := rf.log[len(rf.log)-1].Term
+		lastTerm := rf.log[lastIdx].Term
 		reply.VoteGranted = lastTerm < args.LastLogTerm || (lastTerm == args.LastLogTerm && lastIdx <= args.LastLogIndex)
 	}
-	log.Printf("Server #%d granting vote to #%d: %t", rf.me, args.CandidateID, reply.VoteGranted)
+	log.Printf("Server %d granting vote to Server %d: %t", rf.me, args.CandidateID, reply.VoteGranted)
 	if reply.VoteGranted {
+		rf.currentTerm = args.Term
+		rf.votedFor = args.CandidateID
 		rf.electionTimeOut = false
 	}
 }
@@ -282,16 +302,24 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
+func sleepForRandomTime() {
+	randNum := (rand.Intn(4)*50 + 200)
+	time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
+}
+
 func (rf *Raft) convertToFollower() bool {
-	rf.persister.SaveRaftState([]byte("FOLLOWER"))
-	log.Printf("Server %d converted to follower.", rf.me)
+	rf.serverState = FOLLOWER
+	log.Printf("[Term %d] Server %d converted to follower.", rf.currentTerm, rf.me)
 	for {
-		// log.Printf("Server %d started countdonw as %s", rf.me, "FOLLOWER")
-		randNum := (rand.Intn(500) + 500)
-		time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
-		if rf.electionTimeOut {
-			log.Printf("Time elapsed, server #%d converting to candidate", rf.me)
-			rf.convertToCandidate()
+		rf.electionTimeOut = true
+		sleepForRandomTime()
+		if rf.electionTimeOut && rf.serverState == FOLLOWER {
+			log.Printf("[Term %d] Time elapsed, Server %d converting to candidate", rf.currentTerm, rf.me)
+			go func() {
+				rf.convertToCandidate()
+			}()
+			return true
+		} else if rf.serverState != FOLLOWER {
 			return true
 		}
 	}
@@ -309,7 +337,7 @@ func (rf *Raft) startElection() bool {
 		if peerID == rf.me {
 			continue
 		}
-		log.Printf("#%d sending request vote to %d", rf.me, peerID)
+		log.Printf("[Term %d] Server %d sending request vote to %d", rf.currentTerm, rf.me, peerID)
 		args, reply := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}, RequestVoteReply{}
 		ok := rf.sendRequestVote(peerID, &args, &reply)
 		if !ok {
@@ -318,54 +346,58 @@ func (rf *Raft) startElection() bool {
 		if reply.VoteGranted {
 			voteCount++
 		}
-		rf.electionTimeOut = false
 	}
 	if float64(voteCount) >= float64(len(rf.peers))/2 {
-		log.Printf("Server %d got votes from majority, converting to Leader.", rf.me)
-		return rf.convertToLeader()
+		log.Printf("[Term %d] Server %d got votes from majority, converting to Leader.", rf.currentTerm, rf.me)
+		go func() {
+			rf.convertToLeader()
+		}()
+	} else {
+		log.Printf("[Term %d] Server %d didn't get votes from majority, converting to Follower.", rf.currentTerm, rf.me)
+		go func() {
+			rf.convertToFollower()
+		}()
 	}
-	return rf.convertToFollower()
+	return true
 }
 
 func (rf *Raft) convertToCandidate() bool {
-	rf.persister.SaveRaftState([]byte("CANDIDATE"))
-	log.Printf("Server %d converted to candidate.", rf.me)
+	rf.serverState = CANDIDATE
+	log.Printf("[Term %d] Server %d converted to candidate.", rf.currentTerm, rf.me)
 	// request vote from others
 
 	for {
-		// log.Printf("Server %d started countdonw as %s", rf.me, "CANDIDAYE")
-		randNum := (rand.Intn(500) + 500)
-		time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
-		if rf.electionTimeOut {
-			log.Printf("Time elapsed, calling RequestVote from server #%d", rf.me)
-			go func() {
-				rf.startElection()
-			}()
-		}
-		if string(rf.persister.ReadRaftState()) != "CANDIDATE" {
+		rf.electionTimeOut = true
+		sleepForRandomTime()
+		if rf.electionTimeOut && rf.serverState == CANDIDATE {
+			log.Printf("[Term %d] Time elapsed, starting election Server %d", rf.currentTerm, rf.me)
+			rf.startElection()
+		} else if rf.serverState != CANDIDATE {
 			return true
 		}
 	}
 }
 
 func (rf *Raft) convertToLeader() bool {
-	rf.persister.SaveRaftState([]byte("LEADER"))
-	log.Printf("Server %d promoted as leader.", rf.me)
-	// for {
-	for peerID := range rf.peers {
-		if string(rf.persister.ReadRaftState()) != "LEADER" {
-			return true
+	rf.serverState = LEADER
+	log.Printf("[Term %d] Server %d promoted as leader.", rf.currentTerm, rf.me)
+	for {
+		for peerID := range rf.peers {
+			if rf.serverState != LEADER {
+				return true
+			}
+			if peerID == rf.me {
+				continue
+			}
+			args, reply := &AppendEntriesArgs{Term: rf.currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, &AppendEntriesReply{}
+			log.Printf("[Term %d] Server %d Sending initial heartbeat to %d ...", rf.currentTerm, rf.me, peerID)
+			rf.sendAppendEntries(peerID, args, reply)
+			if !reply.Success {
+				return false
+			}
 		}
-		if peerID == rf.me {
-			continue
-		}
-		args, reply := &AppendEntriesArgs{Term: rf.currentTerm, PrevLogIndex: -1}, &AppendEntriesReply{}
-		rf.sendAppendEntries(peerID, args, reply)
-		log.Printf("Sending initial heartbeat...")
+		time.Sleep(time.Millisecond * 100)
 	}
-	return true
-	// 	time.Sleep(time.Millisecond * 100)
-	// }
 }
 
 //
@@ -385,7 +417,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
-	log.Printf("Make server #%d", rf.me)
+	log.Printf("Make Server %d", rf.me)
 	// Your initialization code here (2A, 2B, 2C).
 	rf.log = make([]LogEntry, 0)
 	rf.nextIndex = make([]int, 0)
@@ -394,9 +426,13 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.log = append(rf.log, LogEntry{Term: 0})
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
-	rf.electionTimeOut = true
-	rf.convertToFollower()
+	if rf.serverState == "" {
+		go func() {
+			rf.convertToFollower()
+		}()
+	}
+
 	state, _ := rf.GetState()
-	log.Printf("Server #%d has state %s.", rf.me, string(state))
+	log.Printf("Server %d has state %s.", rf.me, string(state))
 	return rf
 }
