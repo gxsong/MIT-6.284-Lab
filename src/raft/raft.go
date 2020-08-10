@@ -60,27 +60,91 @@ type LogEntry struct {
 	Command interface{}
 }
 
+type ToFollower struct {
+	convert  chan bool
+	term     chan int
+	votedFor chan int
+}
+
+type ToCandidate struct {
+	convert chan bool
+}
+
+type ToLeader struct {
+	convert chan bool
+}
+
 //
 // A Go object implementing a single Raft peer.
 //
 type Raft struct {
-	mu              sync.Mutex          // Lock to protect shared access to this peer's state
-	peers           []*labrpc.ClientEnd // RPC end points of all peers
-	persister       *Persister          // Object to hold this peer's persisted state
-	me              int                 // this peer's index into peers[]
-	dead            int32               // set by Kill()
-	serverState     ServerState
-	currentTerm     int
-	votedFor        int
-	log             []LogEntry
-	commitIndex     int
-	lastApplied     int
-	nextIndex       []int
-	matchIndex      []int
-	electionTimeOut bool
+	mu          sync.Mutex          // Lock to protect shared access to this peer's state
+	peers       []*labrpc.ClientEnd // RPC end points of all peers
+	persister   *Persister          // Object to hold this peer's persisted state
+	me          int                 // this peer's index into peers[]
+	dead        int32               // set by Kill()
+	serverState ServerState
+	currentTerm int
+	votedFor    int
+	log         []LogEntry
+	commitIndex int
+	lastApplied int
+	nextIndex   []int
+	matchIndex  []int
+	timer       *time.Timer
+	toFollower  ToFollower
+	toCandidate ToCandidate
+	toLeader    ToLeader
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+
+}
+
+func (rf *Raft) saveFollowerState(term int, voteFor int) {
+	rf.mu.Lock()
+	rf.currentTerm = term
+	rf.serverState = FOLLOWER
+	rf.votedFor = voteFor
+	rf.persist()
+	rf.mu.Unlock()
+}
+
+func (rf *Raft) saveCandidateState() {
+	rf.mu.Lock()
+	rf.serverState = CANDIDATE
+	rf.currentTerm++
+	rf.votedFor = rf.me
+	rf.persist()
+	rf.mu.Unlock()
+}
+
+func (rf *Raft) saveLeaderState() {
+	rf.mu.Lock()
+	rf.serverState = LEADER
+	rf.mu.Unlock()
+}
+
+func (rf *Raft) runAsFollower() {
+	log.Printf("Server %d running as follower", rf.me)
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	select {
+	case <-rf.timer.C: // time elapsed, convert to candidate
+		log.Printf("Server %d as Follower time elapsed", rf.me)
+		rf.saveCandidateState()
+		return
+	case <-rf.toFollower.convert: // either got heartbeat from AppendEntries handler, or voted for others in RequestVote handler
+		rf.saveFollowerState(<-rf.toFollower.term, <-rf.toFollower.votedFor)
+		return
+	}
+}
+
+func (rf *Raft) runAsCandidate() {
+	log.Printf("Server %d running as candidate", rf.me)
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+}
+
+func (rf *Raft) runAsLeader() {
 
 }
 
@@ -147,33 +211,45 @@ type AppendEntriesReply struct {
 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	// reset election timeout upon receive
-	rf.electionTimeOut = false
+	log.Printf("[Verbose] Server %d reseted timer by AppendEntries", rf.me)
 
 	rf.mu.Lock()
 	currentTerm := rf.currentTerm
 	rf.mu.Unlock()
 
-	reply.Term = currentTerm
 	if args.Term < currentTerm {
-		// requestor is more outdated than self
+		// requestor is more outdated than self, no need to reset timer
+		reply.Term = currentTerm
 		reply.Success = false
-	} else if args.PrevLogIndex != -1 && (len(rf.log) <= args.PrevLogIndex || (len(rf.log) > args.PrevLogIndex && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm)) {
+		return
+	}
+
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	if args.Term >= currentTerm {
+		rf.mu.Lock()
+		rf.votedFor = args.LeaderID
+		rf.currentTerm = args.Term
+		reply.Term = rf.currentTerm
+		rf.mu.Unlock()
+		go func() {
+			rf.convertToFollower()
+		}()
+	}
+
+	if args.PrevLogIndex != -1 && (len(rf.log) <= args.PrevLogIndex || (len(rf.log) > args.PrevLogIndex && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm)) {
 		// there doesn't exist an entry in rf.log that has a term consistent with requestor
 		reply.Success = false
-	} else {
-		log.Printf("[Term %d] Server %d Appending entry from %d...", args.Term, rf.me, args.LeaderID)
-		// the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
-		prevLogs := rf.log[:args.PrevLogIndex+1]
-		rf.mu.Lock()
-		rf.log = append(prevLogs, args.Entries...)
-		reply.Success = true
-		if rf.serverState != FOLLOWER {
-			go func() {
-				rf.convertToFollower()
-			}()
-		}
-		rf.mu.Unlock()
+		return
 	}
+
+	log.Printf("[Term %d] Server %d Appending entry from %d...", args.Term, rf.me, args.LeaderID)
+	// the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
+	rf.mu.Lock()
+	// TODO: fix log replication logic
+	prevLogs := rf.log[:args.PrevLogIndex+1]
+	rf.log = append(prevLogs, args.Entries...)
+	reply.Success = true
+	rf.mu.Unlock()
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -208,12 +284,13 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
-	log.Printf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
 	rf.mu.Lock()
 	currentTerm := rf.currentTerm
 	rf.mu.Unlock()
-	reply.Term = currentTerm
+	log.Printf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
 	if args.Term < currentTerm { // requestor is stale
+		log.Println("Requestor is stale")
+		reply.Term = currentTerm
 		reply.VoteGranted = false
 		return
 	}
@@ -221,24 +298,41 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	if currentTerm < args.Term {
 		rf.mu.Lock()
 		rf.votedFor = -1
+		rf.currentTerm = args.Term
+		reply.Term = rf.currentTerm
 		rf.mu.Unlock()
+		log.Printf("[Verbose] currentTerm < args.Term. Server %d about to convert to follower", rf.me)
+		go func() {
+			rf.convertToFollower()
+		}()
+		// TODO: should immediately return?
 	}
+
 	rf.mu.Lock()
 	votedFor := rf.votedFor
 	lastIdx := len(rf.log) - 1
 	lastTerm := rf.log[lastIdx].Term
 	rf.mu.Unlock()
-	if votedFor == -1 || votedFor == args.CandidateID { // see which server's log is more up-to-date
-		reply.VoteGranted = lastTerm < args.LastLogTerm || (lastTerm == args.LastLogTerm && lastIdx <= args.LastLogIndex)
-	}
-	log.Printf("Server %d granting vote to Server %d: %t", rf.me, args.CandidateID, reply.VoteGranted)
-	if reply.VoteGranted {
+	// log.Printf("[Verbose] votedFor = %d", votedFor)
+
+	// rf.currentTerm must equal to requestor's term here
+	if votedFor != -1 && votedFor != args.CandidateID { // see which server's log is more up-to-date
+		reply.VoteGranted = false
+		log.Printf("1. votedFor = %d", votedFor)
+	} else if lastTerm > args.LastLogTerm {
+		reply.VoteGranted = false
+		log.Printf("2")
+	} else if lastTerm == args.LastLogTerm && lastIdx > args.LastLogIndex {
+		reply.VoteGranted = false
+		log.Printf("3")
+	} else {
+		reply.VoteGranted = true
 		rf.mu.Lock()
-		rf.currentTerm = args.Term
 		rf.votedFor = args.CandidateID
 		rf.mu.Unlock()
-		rf.electionTimeOut = false
+		rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	}
+	log.Printf("[Term %d] Server %d voted for Server %d: %t", currentTerm, rf.me, args.CandidateID, reply.VoteGranted)
 }
 
 //
@@ -320,32 +414,26 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
-func sleepForRandomTime() {
-	randNum := (rand.Intn(4)*50 + 200)
-	time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
-}
-
 func (rf *Raft) convertToFollower() bool {
 	rf.mu.Lock()
 	rf.serverState = FOLLOWER
-	rf.mu.Unlock()
 	log.Printf("[Term %d] Server %d converted to follower.", rf.currentTerm, rf.me)
-	for {
-		rf.electionTimeOut = true
-		sleepForRandomTime()
+	rf.mu.Unlock()
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	// TODO: need reset timer?
+	for range rf.timer.C {
 		rf.mu.Lock()
-		state := rf.serverState
-		rf.mu.Unlock()
-		if rf.electionTimeOut && state == FOLLOWER {
-			log.Printf("[Term %d] Time elapsed, Server %d converting to candidate", rf.currentTerm, rf.me)
+		defer rf.mu.Unlock()
+		log.Printf("%d [Term %d] Time elapsed, Server %d converting to candidate", time.Now().UnixNano()/1e6, rf.currentTerm, rf.me)
+		if rf.serverState == FOLLOWER {
 			go func() {
 				rf.convertToCandidate()
 			}()
 			return true
-		} else if state != FOLLOWER {
-			return true
 		}
+
 	}
+	return true
 }
 
 func (rf *Raft) startElection() bool {
@@ -355,7 +443,9 @@ func (rf *Raft) startElection() bool {
 	// vote for self
 	rf.votedFor = rf.me
 	rf.mu.Unlock()
-	rf.electionTimeOut = false
+
+	// log.Printff("[Verbose] Server %d reseted timer by StartElection", rf.me)
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	lastIdx := len(rf.log) - 1
 	lastTerm := rf.log[lastIdx].Term
 	voteCount := 1
@@ -369,10 +459,29 @@ func (rf *Raft) startElection() bool {
 		if !ok {
 			log.Printf("Failed sending RequestVote")
 		}
-		if reply.VoteGranted {
+		rf.mu.Lock()
+		if reply.Term > rf.currentTerm {
+			rf.currentTerm = reply.Term
+			go func() {
+				rf.convertToFollower()
+			}()
+			rf.mu.Unlock()
+			log.Printf("1111")
+			return true
+		}
+		if rf.currentTerm != args.Term || rf.serverState != CANDIDATE {
+			rf.mu.Unlock()
+			log.Printf("2222")
+			return true
+		}
+		rf.mu.Unlock()
+		log.Printf("3333")
+		log.Printf("[Verbose] peerID = %d, Server %d, reply.Term = %d, currentTerm = %d, reply.VoteGranted = %t", peerID, rf.me, reply.Term, currentTerm, reply.VoteGranted)
+		if reply.Term == currentTerm && reply.VoteGranted {
 			voteCount++
 		}
 	}
+	rf.mu.Lock()
 	if float64(voteCount) >= float64(len(rf.peers))/2 {
 		log.Printf("[Term %d] Server %d got votes from majority, converting to Leader.", currentTerm, rf.me)
 		go func() {
@@ -384,57 +493,78 @@ func (rf *Raft) startElection() bool {
 			rf.convertToFollower()
 		}()
 	}
+	rf.mu.Unlock()
 	return true
 }
 
 func (rf *Raft) convertToCandidate() bool {
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	rf.mu.Lock()
 	rf.serverState = CANDIDATE
-	rf.mu.Unlock()
 	log.Printf("[Term %d] Server %d converted to candidate.", rf.currentTerm, rf.me)
+	rf.mu.Unlock()
 	// request vote from others
 
-	for {
-		rf.electionTimeOut = true
-		sleepForRandomTime()
+	for range rf.timer.C {
 		rf.mu.Lock()
 		state := rf.serverState
+		log.Printf("[Term %d] Time elapsed, starting election Server %d", rf.currentTerm, rf.me)
 		rf.mu.Unlock()
-		if rf.electionTimeOut && state == CANDIDATE {
-			log.Printf("[Term %d] Time elapsed, starting election Server %d", rf.currentTerm, rf.me)
+		if state == CANDIDATE {
 			rf.startElection()
-		} else if state != CANDIDATE {
-			return true
 		}
+		return true
 	}
+	return true
 }
 
 func (rf *Raft) convertToLeader() bool {
 	rf.mu.Lock()
 	rf.serverState = LEADER
 	rf.mu.Unlock()
-	log.Printf("[Term %d] Server %d promoted as leader.", rf.currentTerm, rf.me)
+	// log.printf("%d [Term %d] Server %d promoted as leader.", time.Now().UnixNano()/1e6, rf.currentTerm, rf.me)
 	for {
 		for peerID := range rf.peers {
 			rf.mu.Lock()
 			currentTerm := rf.currentTerm
-			state := rf.serverState
 			rf.mu.Unlock()
-			if state != LEADER {
-				return true
-			}
 			if peerID == rf.me {
 				continue
 			}
 			args, reply := &AppendEntriesArgs{Term: currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, &AppendEntriesReply{}
-			log.Printf("[Term %d] Server %d Sending initial heartbeat to %d ...", currentTerm, rf.me, peerID)
+			// log.printf("%d [Term %d] Server %d Sending initial heartbeat to %d ...", time.Now().UnixNano()/1e6, currentTerm, rf.me, peerID)
 			rf.sendAppendEntries(peerID, args, reply)
-			if !reply.Success {
-				return false
+			if reply.Term > currentTerm {
+				rf.mu.Lock()
+				rf.currentTerm = reply.Term
+				go func() {
+					rf.convertToFollower()
+				}()
+				rf.mu.Unlock()
+				return true
 			}
 		}
 		time.Sleep(time.Millisecond * 100)
 	}
+}
+
+// func (rf *Raft) resetTimer() {
+// 	log.Printf("Server %d reset timer", rf.me)
+// 		randNum := (rand.Intn(300) + 200)
+// 		// log.Printf("[Verbose] %d", randNum)
+// 		time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
+// 		switch {
+// 		case <-rf.timer.reset:
+// 			continue
+// 		default:
+// 			log.Printf("Server %d time elapsed", rf.me)
+// 			rf.timer.elapse <- true
+// 		}
+// 	}
+// }
+
+func genRandomTimeDuration() int {
+	return rand.Intn(100) + 50
 }
 
 //
@@ -459,17 +589,35 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.log = make([]LogEntry, 0)
 	rf.nextIndex = make([]int, 0)
 	rf.matchIndex = make([]int, 0)
-	rf.votedFor = -1
 	rf.log = append(rf.log, LogEntry{Term: 0})
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
+	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+
 	if rf.serverState == "" {
-		go func() {
-			rf.convertToFollower()
-		}()
+		rf.saveFollowerState(0, -1)
 	}
 
-	state, _ := rf.GetState()
-	log.Printf("Server %d has state %s.", rf.me, string(state))
+	go func() {
+		for {
+			log.Println("==============")
+			rf.mu.Lock()
+			state := rf.serverState
+			rf.mu.Unlock()
+			switch {
+			case state == FOLLOWER:
+				log.Printf("Server %d Converting to Follower", rf.me)
+				// rf.saveFollowerState(<-rf.toFollower.term, <-rf.toFollower.votedFor)
+				rf.runAsFollower()
+				log.Printf("Server %d returned from follower,now has state %s", rf.me, rf.serverState)
+			case state == CANDIDATE:
+				log.Printf("Server %d Converting to Candidate", rf.me)
+				rf.runAsCandidate()
+			case state == LEADER:
+				log.Printf("Server %d Converting to Leader", rf.me)
+			}
+		}
+	}()
+
 	return rf
 }
