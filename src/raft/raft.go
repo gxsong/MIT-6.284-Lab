@@ -95,6 +95,7 @@ type Raft struct {
 	toFollower  ToFollower
 	toCandidate ToCandidate
 	toLeader    ToLeader
+	totalVotes  int
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
@@ -102,27 +103,21 @@ type Raft struct {
 }
 
 func (rf *Raft) saveFollowerState(term int, voteFor int) {
-	rf.mu.Lock()
 	rf.currentTerm = term
 	rf.serverState = FOLLOWER
 	rf.votedFor = voteFor
 	rf.persist()
-	rf.mu.Unlock()
 }
 
 func (rf *Raft) saveCandidateState() {
-	rf.mu.Lock()
 	rf.serverState = CANDIDATE
 	rf.currentTerm++
 	rf.votedFor = rf.me
 	rf.persist()
-	rf.mu.Unlock()
 }
 
 func (rf *Raft) saveLeaderState() {
-	rf.mu.Lock()
 	rf.serverState = LEADER
-	rf.mu.Unlock()
 }
 
 func (rf *Raft) runAsFollower() {
@@ -142,6 +137,74 @@ func (rf *Raft) runAsFollower() {
 func (rf *Raft) runAsCandidate() {
 	log.Printf("Server %d running as candidate", rf.me)
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	// start election
+	go func() {
+		rf.mu.Lock()
+		// check if heartbeat is received and need to convert to follower before sending requestVote request
+		if rf.serverState != CANDIDATE {
+			rf.mu.Unlock()
+			return
+		}
+		lastIdx := len(rf.log) - 1
+		lastTerm := 0
+		if lastIdx != -1 {
+			lastTerm = rf.log[lastIdx].Term
+		}
+		args := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}
+		log.Printf("[Term %d] Server %d sending requestVote", rf.currentTerm, rf.me)
+		rf.mu.Unlock()
+		for peerID := range rf.peers {
+			go func(peerID int) {
+				if peerID == rf.me {
+					return
+				}
+				reply := RequestVoteReply{}
+				ok := rf.sendRequestVote(peerID, &args, &reply)
+
+				if !ok {
+					log.Printf("Failed sending RequestVote")
+					return
+				}
+				rf.mu.Lock()
+				log.Printf("[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", rf.currentTerm, rf.me, peerID, reply.VoteGranted)
+				if reply.Term > rf.currentTerm {
+					rf.toFollower.convert <- true
+					rf.mu.Unlock()
+					return
+				}
+				// in case of 2 requestVote go routines races and one of them got reply.Term > rf.currentTerm
+				// then rf.currentTerm will be updated and serverState will be FOLLOWER
+				if rf.currentTerm != args.Term || rf.serverState != CANDIDATE {
+					rf.mu.Unlock()
+					return
+				}
+				// check state in case it has already been converted to leader
+				if reply.VoteGranted {
+					rf.totalVotes++
+					if rf.totalVotes > len(rf.peers)/2 && rf.serverState == CANDIDATE {
+						rf.toLeader.convert <- true
+					}
+				}
+				rf.mu.Unlock()
+			}(peerID)
+		}
+	}()
+	select {
+	case <-rf.timer.C:
+		log.Printf("Server %d as Candidate time elapsed", rf.me)
+		rf.saveCandidateState()
+		return
+	case <-rf.toFollower.convert:
+		log.Printf("Server %d as Candidate converting to Follower", rf.me)
+		rf.mu.Lock()
+		rf.saveFollowerState(rf.currentTerm, -1)
+		rf.mu.Unlock()
+		return
+	case <-rf.toLeader.convert:
+		log.Printf("Server %d as Candidate converting to Leader", rf.me)
+		rf.saveLeaderState()
+		return
+	}
 }
 
 func (rf *Raft) runAsLeader() {
@@ -285,54 +348,36 @@ type RequestVoteReply struct {
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.mu.Lock()
-	currentTerm := rf.currentTerm
-	rf.mu.Unlock()
 	log.Printf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
-	if args.Term < currentTerm { // requestor is stale
+	if args.Term < rf.currentTerm { // requestor is stale
 		log.Println("Requestor is stale")
-		reply.Term = currentTerm
+		reply.Term = rf.currentTerm
 		reply.VoteGranted = false
+		rf.mu.Unlock()
 		return
 	}
-
-	if currentTerm < args.Term {
-		rf.mu.Lock()
-		rf.votedFor = -1
-		rf.currentTerm = args.Term
-		reply.Term = rf.currentTerm
-		rf.mu.Unlock()
-		log.Printf("[Verbose] currentTerm < args.Term. Server %d about to convert to follower", rf.me)
-		go func() {
-			rf.convertToFollower()
-		}()
-		// TODO: should immediately return?
+	if args.Term > rf.currentTerm {
+		rf.saveFollowerState(args.Term, -1)
+		log.Printf("Server %d, args.Term > rf.currentTerm", rf.me)
 	}
-
-	rf.mu.Lock()
-	votedFor := rf.votedFor
 	lastIdx := len(rf.log) - 1
-	lastTerm := rf.log[lastIdx].Term
-	rf.mu.Unlock()
-	// log.Printf("[Verbose] votedFor = %d", votedFor)
-
-	// rf.currentTerm must equal to requestor's term here
-	if votedFor != -1 && votedFor != args.CandidateID { // see which server's log is more up-to-date
-		reply.VoteGranted = false
-		log.Printf("1. votedFor = %d", votedFor)
-	} else if lastTerm > args.LastLogTerm {
-		reply.VoteGranted = false
-		log.Printf("2")
-	} else if lastTerm == args.LastLogTerm && lastIdx > args.LastLogIndex {
-		reply.VoteGranted = false
-		log.Printf("3")
-	} else {
-		reply.VoteGranted = true
-		rf.mu.Lock()
-		rf.votedFor = args.CandidateID
-		rf.mu.Unlock()
-		rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	lastTerm := 0
+	if lastIdx != -1 {
+		lastTerm = rf.log[lastIdx].Term
 	}
-	log.Printf("[Term %d] Server %d voted for Server %d: %t", currentTerm, rf.me, args.CandidateID, reply.VoteGranted)
+
+	if args.LastLogTerm < lastTerm || args.LastLogTerm == lastTerm && args.LastLogIndex < lastIdx {
+		reply.Term = rf.currentTerm
+		reply.VoteGranted = false
+	} else {
+		reply.Term = rf.currentTerm
+		reply.VoteGranted = true
+		rf.votedFor = args.CandidateID
+		rf.persist()
+	}
+
+	log.Printf("[Term %d] Server %d voted for Server %d: %t", rf.currentTerm, rf.me, args.CandidateID, reply.VoteGranted)
+	rf.mu.Unlock()
 }
 
 //
@@ -589,7 +634,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.log = make([]LogEntry, 0)
 	rf.nextIndex = make([]int, 0)
 	rf.matchIndex = make([]int, 0)
-	rf.log = append(rf.log, LogEntry{Term: 0})
+	rf.totalVotes = 0
+	rf.toFollower.convert = make(chan bool)
+	rf.toCandidate.convert = make(chan bool)
+	rf.toLeader.convert = make(chan bool)
+	// rf.log = append(rf.log, LogEntry{Term: 0})
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
