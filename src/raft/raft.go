@@ -168,6 +168,7 @@ func (rf *Raft) runAsCandidate() {
 				rf.mu.Lock()
 				log.Printf("[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", rf.currentTerm, rf.me, peerID, reply.VoteGranted)
 				if reply.Term > rf.currentTerm {
+					rf.currentTerm = reply.Term
 					rf.toFollower.convert <- true
 					rf.mu.Unlock()
 					return
@@ -208,7 +209,38 @@ func (rf *Raft) runAsCandidate() {
 }
 
 func (rf *Raft) runAsLeader() {
-
+	log.Printf("Server %d running as leader", rf.me)
+	for peerID := range rf.peers {
+		go func(peerID int) {
+			if peerID == rf.me {
+				return
+			}
+			// TODO: populate arg fields for actual log update, currently only for heartbeat
+			rf.mu.Lock()
+			args, reply := AppendEntriesArgs{Term: rf.currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, AppendEntriesReply{}
+			rf.mu.Unlock()
+			rf.sendAppendEntries(peerID, &args, &reply)
+			rf.mu.Lock()
+			if reply.Term > rf.currentTerm {
+				rf.currentTerm = reply.Term
+				rf.toFollower.convert <- true
+				rf.mu.Unlock()
+				return
+			}
+			// same as the race condition in runAsCandidate()
+			if rf.currentTerm != args.Term || rf.serverState != LEADER {
+				rf.mu.Unlock()
+				return
+			}
+		}(peerID)
+	}
+	select {
+	case <-rf.toFollower.convert:
+		log.Printf("Server %d as Leader converting to Follower", rf.me)
+		rf.mu.Lock()
+		rf.saveFollowerState(rf.currentTerm, -1)
+		rf.mu.Unlock()
+	}
 }
 
 // return currentTerm and whether this server
@@ -276,43 +308,43 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	// reset election timeout upon receive
 	log.Printf("[Verbose] Server %d reseted timer by AppendEntries", rf.me)
 
-	rf.mu.Lock()
-	currentTerm := rf.currentTerm
-	rf.mu.Unlock()
+	// rf.mu.Lock()
+	// currentTerm := rf.currentTerm
+	// rf.mu.Unlock()
 
-	if args.Term < currentTerm {
-		// requestor is more outdated than self, no need to reset timer
-		reply.Term = currentTerm
-		reply.Success = false
-		return
-	}
+	// if args.Term < currentTerm {
+	// 	// requestor is more outdated than self, no need to reset timer
+	// 	reply.Term = currentTerm
+	// 	reply.Success = false
+	// 	return
+	// }
 
-	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	if args.Term >= currentTerm {
-		rf.mu.Lock()
-		rf.votedFor = args.LeaderID
-		rf.currentTerm = args.Term
-		reply.Term = rf.currentTerm
-		rf.mu.Unlock()
-		go func() {
-			rf.convertToFollower()
-		}()
-	}
+	// rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	// if args.Term >= currentTerm {
+	// 	rf.mu.Lock()
+	// 	rf.votedFor = args.LeaderID
+	// 	rf.currentTerm = args.Term
+	// 	reply.Term = rf.currentTerm
+	// 	rf.mu.Unlock()
+	// 	go func() {
+	// 		rf.convertToFollower()
+	// 	}()
+	// }
 
-	if args.PrevLogIndex != -1 && (len(rf.log) <= args.PrevLogIndex || (len(rf.log) > args.PrevLogIndex && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm)) {
-		// there doesn't exist an entry in rf.log that has a term consistent with requestor
-		reply.Success = false
-		return
-	}
+	// if args.PrevLogIndex != -1 && (len(rf.log) <= args.PrevLogIndex || (len(rf.log) > args.PrevLogIndex && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm)) {
+	// 	// there doesn't exist an entry in rf.log that has a term consistent with requestor
+	// 	reply.Success = false
+	// 	return
+	// }
 
-	log.Printf("[Term %d] Server %d Appending entry from %d...", args.Term, rf.me, args.LeaderID)
-	// the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
-	rf.mu.Lock()
-	// TODO: fix log replication logic
-	prevLogs := rf.log[:args.PrevLogIndex+1]
-	rf.log = append(prevLogs, args.Entries...)
-	reply.Success = true
-	rf.mu.Unlock()
+	// log.Printf("[Term %d] Server %d Appending entry from %d...", args.Term, rf.me, args.LeaderID)
+	// // the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
+	// rf.mu.Lock()
+	// // TODO: fix log replication logic
+	// prevLogs := rf.log[:args.PrevLogIndex+1]
+	// rf.log = append(prevLogs, args.Entries...)
+	// reply.Success = true
+	// rf.mu.Unlock()
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -656,7 +688,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 			switch {
 			case state == FOLLOWER:
 				log.Printf("Server %d Converting to Follower", rf.me)
-				// rf.saveFollowerState(<-rf.toFollower.term, <-rf.toFollower.votedFor)
 				rf.runAsFollower()
 				log.Printf("Server %d returned from follower,now has state %s", rf.me, rf.serverState)
 			case state == CANDIDATE:
@@ -664,6 +695,8 @@ func Make(peers []*labrpc.ClientEnd, me int,
 				rf.runAsCandidate()
 			case state == LEADER:
 				log.Printf("Server %d Converting to Leader", rf.me)
+				rf.runAsLeader()
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}()
