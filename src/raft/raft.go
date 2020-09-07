@@ -60,20 +60,6 @@ type LogEntry struct {
 	Command interface{}
 }
 
-type ToFollower struct {
-	convert  chan bool
-	term     chan int
-	votedFor chan int
-}
-
-type ToCandidate struct {
-	convert chan bool
-}
-
-type ToLeader struct {
-	convert chan bool
-}
-
 //
 // A Go object implementing a single Raft peer.
 //
@@ -92,9 +78,6 @@ type Raft struct {
 	nextIndex   []int
 	matchIndex  []int
 	timer       *time.Timer
-	toFollower  ToFollower
-	toCandidate ToCandidate
-	toLeader    ToLeader
 	totalVotes  int
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
@@ -121,21 +104,20 @@ func (rf *Raft) saveLeaderState() {
 }
 
 func (rf *Raft) runAsFollower() {
-	log.Printf("Server %d running as follower", rf.me)
+	DPrintf("Server %d running as follower", rf.me)
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	select {
 	case <-rf.timer.C: // time elapsed, convert to candidate
-		log.Printf("Server %d as Follower time elapsed", rf.me)
+		DPrintf("Server %d as Follower time elapsed", rf.me)
+		rf.mu.Lock()
 		rf.saveCandidateState()
-		return
-	case <-rf.toFollower.convert: // either got heartbeat from AppendEntries handler, or voted for others in RequestVote handler
-		rf.saveFollowerState(<-rf.toFollower.term, <-rf.toFollower.votedFor)
+		rf.mu.Unlock()
 		return
 	}
 }
 
 func (rf *Raft) runAsCandidate() {
-	log.Printf("Server %d running as candidate", rf.me)
+	DPrintf("Server %d running as candidate", rf.me)
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	// start election
 	go func() {
@@ -151,7 +133,7 @@ func (rf *Raft) runAsCandidate() {
 			lastTerm = rf.log[lastIdx].Term
 		}
 		args := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}
-		log.Printf("[Term %d] Server %d sending requestVote", rf.currentTerm, rf.me)
+		DPrintf("[Term %d] Server %d sending requestVote", rf.currentTerm, rf.me)
 		rf.mu.Unlock()
 		for peerID := range rf.peers {
 			go func(peerID int) {
@@ -162,14 +144,14 @@ func (rf *Raft) runAsCandidate() {
 				ok := rf.sendRequestVote(peerID, &args, &reply)
 
 				if !ok {
-					log.Printf("Failed sending RequestVote")
+					DPrintf("Server %d Failed sending RequestVote to %d", rf.me, peerID)
 					return
 				}
 				rf.mu.Lock()
-				log.Printf("[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", rf.currentTerm, rf.me, peerID, reply.VoteGranted)
+				DPrintf("[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", rf.currentTerm, rf.me, peerID, reply.VoteGranted)
 				if reply.Term > rf.currentTerm {
 					rf.currentTerm = reply.Term
-					rf.toFollower.convert <- true
+					rf.saveFollowerState(rf.currentTerm, -1)
 					rf.mu.Unlock()
 					return
 				}
@@ -183,7 +165,7 @@ func (rf *Raft) runAsCandidate() {
 				if reply.VoteGranted {
 					rf.totalVotes++
 					if rf.totalVotes > len(rf.peers)/2 && rf.serverState == CANDIDATE {
-						rf.toLeader.convert <- true
+						rf.saveLeaderState()
 					}
 				}
 				rf.mu.Unlock()
@@ -192,54 +174,40 @@ func (rf *Raft) runAsCandidate() {
 	}()
 	select {
 	case <-rf.timer.C:
-		log.Printf("Server %d as Candidate time elapsed", rf.me)
-		rf.saveCandidateState()
-		return
-	case <-rf.toFollower.convert:
-		log.Printf("Server %d as Candidate converting to Follower", rf.me)
+		DPrintf("Server %d as Candidate time elapsed", rf.me)
 		rf.mu.Lock()
-		rf.saveFollowerState(rf.currentTerm, -1)
+		rf.saveCandidateState()
 		rf.mu.Unlock()
-		return
-	case <-rf.toLeader.convert:
-		log.Printf("Server %d as Candidate converting to Leader", rf.me)
-		rf.saveLeaderState()
 		return
 	}
 }
 
 func (rf *Raft) runAsLeader() {
-	log.Printf("Server %d running as leader", rf.me)
+	DPrintf("Server %d running as leader", rf.me)
 	for peerID := range rf.peers {
+		DPrintf("Server %d sending heartbeat to Server %d", rf.me, peerID)
 		go func(peerID int) {
 			if peerID == rf.me {
 				return
 			}
 			// TODO: populate arg fields for actual log update, currently only for heartbeat
 			rf.mu.Lock()
+			defer rf.mu.Unlock()
 			args, reply := AppendEntriesArgs{Term: rf.currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, AppendEntriesReply{}
-			rf.mu.Unlock()
-			rf.sendAppendEntries(peerID, &args, &reply)
-			rf.mu.Lock()
-			if reply.Term > rf.currentTerm {
-				rf.currentTerm = reply.Term
-				rf.toFollower.convert <- true
-				rf.mu.Unlock()
+			// rf.mu.Unlock()
+			ok := rf.sendAppendEntries(peerID, &args, &reply)
+			if !ok {
+				DPrintf("Server %d failed sending appendEntries to Server %d", rf.me, peerID)
 				return
 			}
-			// same as the race condition in runAsCandidate()
-			if rf.currentTerm != args.Term || rf.serverState != LEADER {
-				rf.mu.Unlock()
-				return
+			DPrintf("Server %d got heartbeat reply, reply.Term = %d, currentTerm = %d", rf.me, reply.Term, rf.currentTerm)
+			if reply.Term > rf.currentTerm {
+				DPrintf("Server %d as leader is stale, in %d", rf.me, peerID)
+				rf.currentTerm = reply.Term
+				rf.saveFollowerState(rf.currentTerm, -1)
 			}
 		}(peerID)
-	}
-	select {
-	case <-rf.toFollower.convert:
-		log.Printf("Server %d as Leader converting to Follower", rf.me)
-		rf.mu.Lock()
-		rf.saveFollowerState(rf.currentTerm, -1)
-		rf.mu.Unlock()
+		DPrintf("Server %d returned from goroutine heartbeat to Server %d", rf.me, peerID)
 	}
 }
 
@@ -248,6 +216,7 @@ func (rf *Raft) runAsLeader() {
 func (rf *Raft) GetState() (int, bool) {
 	// Your code here (2A).
 	rf.mu.Lock()
+	DPrintf("Get State on Server %d, state = %s", rf.me, rf.serverState)
 	defer rf.mu.Unlock()
 	return rf.currentTerm, rf.serverState == LEADER
 }
@@ -306,45 +275,22 @@ type AppendEntriesReply struct {
 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	// reset election timeout upon receive
-	log.Printf("[Verbose] Server %d reseted timer by AppendEntries", rf.me)
 
-	// rf.mu.Lock()
-	// currentTerm := rf.currentTerm
-	// rf.mu.Unlock()
+	rf.mu.Lock()
+	DPrintf("Server %d [Term %d] received heartbeat from Server %d [Term %d]", rf.me, rf.currentTerm, args.LeaderID, args.Term)
+	if args.Term < rf.currentTerm {
+		// requestor is stale, no need to reset timer
+		reply.Term = rf.currentTerm
+		reply.Success = false
+		rf.mu.Unlock()
+		return
+	}
 
-	// if args.Term < currentTerm {
-	// 	// requestor is more outdated than self, no need to reset timer
-	// 	reply.Term = currentTerm
-	// 	reply.Success = false
-	// 	return
-	// }
-
-	// rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	// if args.Term >= currentTerm {
-	// 	rf.mu.Lock()
-	// 	rf.votedFor = args.LeaderID
-	// 	rf.currentTerm = args.Term
-	// 	reply.Term = rf.currentTerm
-	// 	rf.mu.Unlock()
-	// 	go func() {
-	// 		rf.convertToFollower()
-	// 	}()
-	// }
-
-	// if args.PrevLogIndex != -1 && (len(rf.log) <= args.PrevLogIndex || (len(rf.log) > args.PrevLogIndex && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm)) {
-	// 	// there doesn't exist an entry in rf.log that has a term consistent with requestor
-	// 	reply.Success = false
-	// 	return
-	// }
-
-	// log.Printf("[Term %d] Server %d Appending entry from %d...", args.Term, rf.me, args.LeaderID)
-	// // the invariant here is: rf.log and requestor's log are consistent at and before prevLogIndex
-	// rf.mu.Lock()
-	// // TODO: fix log replication logic
-	// prevLogs := rf.log[:args.PrevLogIndex+1]
-	// rf.log = append(prevLogs, args.Entries...)
-	// reply.Success = true
-	// rf.mu.Unlock()
+	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	rf.votedFor = args.LeaderID
+	rf.currentTerm = args.Term
+	reply.Term = rf.currentTerm
+	rf.mu.Unlock()
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -380,7 +326,7 @@ type RequestVoteReply struct {
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
 	rf.mu.Lock()
-	log.Printf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
+	DPrintf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
 	if args.Term < rf.currentTerm { // requestor is stale
 		log.Println("Requestor is stale")
 		reply.Term = rf.currentTerm
@@ -388,9 +334,17 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		rf.mu.Unlock()
 		return
 	}
+	if args.Term == rf.currentTerm && rf.votedFor != -1 && rf.votedFor != args.CandidateID {
+		log.Println("Already voted for others in the same term")
+		reply.Term = rf.currentTerm
+		reply.VoteGranted = false
+		rf.mu.Unlock()
+		return
+	}
+
 	if args.Term > rf.currentTerm {
-		rf.saveFollowerState(args.Term, -1)
-		log.Printf("Server %d, args.Term > rf.currentTerm", rf.me)
+		rf.saveFollowerState(args.Term, rf.votedFor)
+		DPrintf("Server %d is stale and received request vote, converting to follower", rf.me)
 	}
 	lastIdx := len(rf.log) - 1
 	lastTerm := 0
@@ -408,7 +362,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		rf.persist()
 	}
 
-	log.Printf("[Term %d] Server %d voted for Server %d: %t", rf.currentTerm, rf.me, args.CandidateID, reply.VoteGranted)
+	DPrintf("[Term %d] Server %d voted for Server %d: %t", rf.currentTerm, rf.me, args.CandidateID, reply.VoteGranted)
 	rf.mu.Unlock()
 }
 
@@ -491,157 +445,8 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
-func (rf *Raft) convertToFollower() bool {
-	rf.mu.Lock()
-	rf.serverState = FOLLOWER
-	log.Printf("[Term %d] Server %d converted to follower.", rf.currentTerm, rf.me)
-	rf.mu.Unlock()
-	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	// TODO: need reset timer?
-	for range rf.timer.C {
-		rf.mu.Lock()
-		defer rf.mu.Unlock()
-		log.Printf("%d [Term %d] Time elapsed, Server %d converting to candidate", time.Now().UnixNano()/1e6, rf.currentTerm, rf.me)
-		if rf.serverState == FOLLOWER {
-			go func() {
-				rf.convertToCandidate()
-			}()
-			return true
-		}
-
-	}
-	return true
-}
-
-func (rf *Raft) startElection() bool {
-	rf.mu.Lock()
-	rf.currentTerm++
-	currentTerm := rf.currentTerm
-	// vote for self
-	rf.votedFor = rf.me
-	rf.mu.Unlock()
-
-	// log.Printff("[Verbose] Server %d reseted timer by StartElection", rf.me)
-	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	lastIdx := len(rf.log) - 1
-	lastTerm := rf.log[lastIdx].Term
-	voteCount := 1
-	for peerID := range rf.peers {
-		if peerID == rf.me {
-			continue
-		}
-		log.Printf("[Term %d] Server %d sending request vote to %d", currentTerm, rf.me, peerID)
-		args, reply := RequestVoteArgs{currentTerm, rf.me, lastIdx, lastTerm}, RequestVoteReply{}
-		ok := rf.sendRequestVote(peerID, &args, &reply)
-		if !ok {
-			log.Printf("Failed sending RequestVote")
-		}
-		rf.mu.Lock()
-		if reply.Term > rf.currentTerm {
-			rf.currentTerm = reply.Term
-			go func() {
-				rf.convertToFollower()
-			}()
-			rf.mu.Unlock()
-			log.Printf("1111")
-			return true
-		}
-		if rf.currentTerm != args.Term || rf.serverState != CANDIDATE {
-			rf.mu.Unlock()
-			log.Printf("2222")
-			return true
-		}
-		rf.mu.Unlock()
-		log.Printf("3333")
-		log.Printf("[Verbose] peerID = %d, Server %d, reply.Term = %d, currentTerm = %d, reply.VoteGranted = %t", peerID, rf.me, reply.Term, currentTerm, reply.VoteGranted)
-		if reply.Term == currentTerm && reply.VoteGranted {
-			voteCount++
-		}
-	}
-	rf.mu.Lock()
-	if float64(voteCount) >= float64(len(rf.peers))/2 {
-		log.Printf("[Term %d] Server %d got votes from majority, converting to Leader.", currentTerm, rf.me)
-		go func() {
-			rf.convertToLeader()
-		}()
-	} else {
-		log.Printf("[Term %d] Server %d didn't get votes from majority, converting to Follower.", currentTerm, rf.me)
-		go func() {
-			rf.convertToFollower()
-		}()
-	}
-	rf.mu.Unlock()
-	return true
-}
-
-func (rf *Raft) convertToCandidate() bool {
-	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	rf.mu.Lock()
-	rf.serverState = CANDIDATE
-	log.Printf("[Term %d] Server %d converted to candidate.", rf.currentTerm, rf.me)
-	rf.mu.Unlock()
-	// request vote from others
-
-	for range rf.timer.C {
-		rf.mu.Lock()
-		state := rf.serverState
-		log.Printf("[Term %d] Time elapsed, starting election Server %d", rf.currentTerm, rf.me)
-		rf.mu.Unlock()
-		if state == CANDIDATE {
-			rf.startElection()
-		}
-		return true
-	}
-	return true
-}
-
-func (rf *Raft) convertToLeader() bool {
-	rf.mu.Lock()
-	rf.serverState = LEADER
-	rf.mu.Unlock()
-	// log.printf("%d [Term %d] Server %d promoted as leader.", time.Now().UnixNano()/1e6, rf.currentTerm, rf.me)
-	for {
-		for peerID := range rf.peers {
-			rf.mu.Lock()
-			currentTerm := rf.currentTerm
-			rf.mu.Unlock()
-			if peerID == rf.me {
-				continue
-			}
-			args, reply := &AppendEntriesArgs{Term: currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, &AppendEntriesReply{}
-			// log.printf("%d [Term %d] Server %d Sending initial heartbeat to %d ...", time.Now().UnixNano()/1e6, currentTerm, rf.me, peerID)
-			rf.sendAppendEntries(peerID, args, reply)
-			if reply.Term > currentTerm {
-				rf.mu.Lock()
-				rf.currentTerm = reply.Term
-				go func() {
-					rf.convertToFollower()
-				}()
-				rf.mu.Unlock()
-				return true
-			}
-		}
-		time.Sleep(time.Millisecond * 100)
-	}
-}
-
-// func (rf *Raft) resetTimer() {
-// 	log.Printf("Server %d reset timer", rf.me)
-// 		randNum := (rand.Intn(300) + 200)
-// 		// log.Printf("[Verbose] %d", randNum)
-// 		time.Sleep(time.Duration(randNum) * time.Millisecond) // sleeps for [1000, 5000) ms
-// 		switch {
-// 		case <-rf.timer.reset:
-// 			continue
-// 		default:
-// 			log.Printf("Server %d time elapsed", rf.me)
-// 			rf.timer.elapse <- true
-// 		}
-// 	}
-// }
-
 func genRandomTimeDuration() int {
-	return rand.Intn(100) + 50
+	return rand.Intn(150) + 300
 }
 
 //
@@ -661,42 +466,34 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
-	log.Printf("Make Server %d", rf.me)
+	DPrintf("Make Server %d", rf.me)
 	// Your initialization code here (2A, 2B, 2C).
 	rf.log = make([]LogEntry, 0)
 	rf.nextIndex = make([]int, 0)
 	rf.matchIndex = make([]int, 0)
 	rf.totalVotes = 0
-	rf.toFollower.convert = make(chan bool)
-	rf.toCandidate.convert = make(chan bool)
-	rf.toLeader.convert = make(chan bool)
-	// rf.log = append(rf.log, LogEntry{Term: 0})
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-
+	rf.mu.Lock()
+	DPrintf("Server %d started with state %s", rf.me, rf.serverState)
 	if rf.serverState == "" {
 		rf.saveFollowerState(0, -1)
 	}
-
+	rf.mu.Unlock()
 	go func() {
 		for {
-			log.Println("==============")
 			rf.mu.Lock()
 			state := rf.serverState
 			rf.mu.Unlock()
 			switch {
 			case state == FOLLOWER:
-				log.Printf("Server %d Converting to Follower", rf.me)
 				rf.runAsFollower()
-				log.Printf("Server %d returned from follower,now has state %s", rf.me, rf.serverState)
 			case state == CANDIDATE:
-				log.Printf("Server %d Converting to Candidate", rf.me)
 				rf.runAsCandidate()
 			case state == LEADER:
-				log.Printf("Server %d Converting to Leader", rf.me)
 				rf.runAsLeader()
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(150 * time.Millisecond)
 			}
 		}
 	}()
