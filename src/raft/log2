@@ -1,0 +1,974 @@
+2020/09/07 18:16:24 Make Server 0
+2020/09/07 18:16:24 Server 0 started with state 
+2020/09/07 18:16:24 Server 0 running as follower
+2020/09/07 18:16:24 Make Server 1
+2020/09/07 18:16:24 Server 1 started with state 
+2020/09/07 18:16:24 Server 1 running as follower
+2020/09/07 18:16:24 Make Server 2
+2020/09/07 18:16:24 Server 2 started with state 
+2020/09/07 18:16:24 Server 2 running as follower
+Test (2A): initial election ...
+2020/09/07 18:16:25 Server 0 as Follower time elapsed
+2020/09/07 18:16:25 Server 0 running as candidate
+2020/09/07 18:16:25 [Term 1] Server 0 sending requestVote
+2020/09/07 18:16:25 Server 2 [Term = 0] received vote request from 0 [Term = 1]
+2020/09/07 18:16:25 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 1] Server 2 voted for Server 0: true
+2020/09/07 18:16:25 Server 1 [Term = 0] received vote request from 0 [Term = 1]
+2020/09/07 18:16:25 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 1] Server 1 voted for Server 0: true
+2020/09/07 18:16:25 [Term 1] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:25 [Term 1] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:25 Server 2 as Follower time elapsed
+2020/09/07 18:16:25 Server 2 running as candidate
+2020/09/07 18:16:25 [Term 2] Server 2 sending requestVote
+2020/09/07 18:16:25 Server 1 [Term = 1] received vote request from 2 [Term = 2]
+2020/09/07 18:16:25 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 2] Server 1 voted for Server 2: true
+2020/09/07 18:16:25 Server 0 [Term = 1] received vote request from 2 [Term = 2]
+2020/09/07 18:16:25 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 2] Server 0 voted for Server 2: true
+2020/09/07 18:16:25 [Term 2] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:25 [Term 2] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:25 Server 1 as Follower time elapsed
+2020/09/07 18:16:25 Server 1 running as candidate
+2020/09/07 18:16:25 [Term 3] Server 1 sending requestVote
+2020/09/07 18:16:25 Server 2 [Term = 2] received vote request from 1 [Term = 3]
+2020/09/07 18:16:25 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 3] Server 2 voted for Server 1: true
+2020/09/07 18:16:25 Server 0 [Term = 2] received vote request from 1 [Term = 3]
+2020/09/07 18:16:25 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 3] Server 0 voted for Server 1: true
+2020/09/07 18:16:25 [Term 3] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:25 [Term 3] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:25 Get State on Server 0, state = FOLLOWER
+2020/09/07 18:16:25 Get State on Server 1, state = LEADER
+2020/09/07 18:16:25 Get State on Server 2, state = FOLLOWER
+2020/09/07 18:16:25 Get State on Server 0, state = FOLLOWER
+2020/09/07 18:16:25 Server 0 has term 3
+2020/09/07 18:16:25 Get State on Server 1, state = LEADER
+2020/09/07 18:16:25 Server 1 has term 3
+2020/09/07 18:16:25 Get State on Server 2, state = FOLLOWER
+2020/09/07 18:16:25 Server 2 has term 3
+2020/09/07 18:16:25 Server 0 as Candidate time elapsed
+2020/09/07 18:16:25 Server 0 running as candidate
+2020/09/07 18:16:25 [Term 4] Server 0 sending requestVote
+2020/09/07 18:16:25 Server 2 [Term = 3] received vote request from 0 [Term = 4]
+2020/09/07 18:16:25 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 4] Server 2 voted for Server 0: true
+2020/09/07 18:16:25 Server 1 [Term = 3] received vote request from 0 [Term = 4]
+2020/09/07 18:16:25 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 4] Server 1 voted for Server 0: true
+2020/09/07 18:16:25 [Term 4] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:25 [Term 4] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:25 Server 1 as Candidate time elapsed
+2020/09/07 18:16:25 Server 1 running as candidate
+2020/09/07 18:16:25 [Term 5] Server 1 sending requestVote
+2020/09/07 18:16:25 Server 0 [Term = 4] received vote request from 1 [Term = 5]
+2020/09/07 18:16:25 Server 2 [Term = 4] received vote request from 1 [Term = 5]
+2020/09/07 18:16:25 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 5] Server 0 voted for Server 1: true
+2020/09/07 18:16:25 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 5] Server 2 voted for Server 1: true
+2020/09/07 18:16:25 [Term 5] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:25 [Term 5] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:25 Server 2 as Candidate time elapsed
+2020/09/07 18:16:25 Server 2 running as candidate
+2020/09/07 18:16:25 [Term 6] Server 2 sending requestVote
+2020/09/07 18:16:25 Server 1 [Term = 5] received vote request from 2 [Term = 6]
+2020/09/07 18:16:25 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 6] Server 1 voted for Server 2: true
+2020/09/07 18:16:25 Server 0 [Term = 5] received vote request from 2 [Term = 6]
+2020/09/07 18:16:25 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 6] Server 0 voted for Server 2: true
+2020/09/07 18:16:25 [Term 6] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:25 [Term 6] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:25 Server 0 as Candidate time elapsed
+2020/09/07 18:16:25 Server 0 running as candidate
+2020/09/07 18:16:25 [Term 7] Server 0 sending requestVote
+2020/09/07 18:16:25 Server 2 [Term = 6] received vote request from 0 [Term = 7]
+2020/09/07 18:16:25 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 7] Server 2 voted for Server 0: true
+2020/09/07 18:16:25 Server 1 [Term = 6] received vote request from 0 [Term = 7]
+2020/09/07 18:16:25 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 7] Server 1 voted for Server 0: true
+2020/09/07 18:16:25 [Term 7] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:25 [Term 7] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:25 Server 1 as Candidate time elapsed
+2020/09/07 18:16:25 Server 1 running as candidate
+2020/09/07 18:16:25 [Term 8] Server 1 sending requestVote
+2020/09/07 18:16:25 Server 0 [Term = 7] received vote request from 1 [Term = 8]
+2020/09/07 18:16:25 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 8] Server 0 voted for Server 1: true
+2020/09/07 18:16:25 Server 2 [Term = 7] received vote request from 1 [Term = 8]
+2020/09/07 18:16:25 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 8] Server 2 voted for Server 1: true
+2020/09/07 18:16:25 [Term 8] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:25 [Term 8] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:25 Server 2 as Candidate time elapsed
+2020/09/07 18:16:25 Server 2 running as candidate
+2020/09/07 18:16:25 [Term 9] Server 2 sending requestVote
+2020/09/07 18:16:25 Server 0 [Term = 8] received vote request from 2 [Term = 9]
+2020/09/07 18:16:25 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 9] Server 0 voted for Server 2: true
+2020/09/07 18:16:25 Server 1 [Term = 8] received vote request from 2 [Term = 9]
+2020/09/07 18:16:25 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:25 [Term 9] Server 1 voted for Server 2: true
+2020/09/07 18:16:25 [Term 9] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:25 [Term 9] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:26 Server 0 as Candidate time elapsed
+2020/09/07 18:16:26 Server 0 running as candidate
+2020/09/07 18:16:26 [Term 10] Server 0 sending requestVote
+2020/09/07 18:16:26 Server 2 [Term = 9] received vote request from 0 [Term = 10]
+2020/09/07 18:16:26 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 10] Server 2 voted for Server 0: true
+2020/09/07 18:16:26 Server 1 [Term = 9] received vote request from 0 [Term = 10]
+2020/09/07 18:16:26 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 10] Server 1 voted for Server 0: true
+2020/09/07 18:16:26 [Term 10] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:26 [Term 10] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:26 Server 1 as Candidate time elapsed
+2020/09/07 18:16:26 Server 1 running as candidate
+2020/09/07 18:16:26 [Term 11] Server 1 sending requestVote
+2020/09/07 18:16:26 Server 2 [Term = 10] received vote request from 1 [Term = 11]
+2020/09/07 18:16:26 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 11] Server 2 voted for Server 1: true
+2020/09/07 18:16:26 Server 0 [Term = 10] received vote request from 1 [Term = 11]
+2020/09/07 18:16:26 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 11] Server 0 voted for Server 1: true
+2020/09/07 18:16:26 [Term 11] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:26 [Term 11] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:26 Server 2 as Candidate time elapsed
+2020/09/07 18:16:26 Server 2 running as candidate
+2020/09/07 18:16:26 [Term 12] Server 2 sending requestVote
+2020/09/07 18:16:26 Server 0 [Term = 11] received vote request from 2 [Term = 12]
+2020/09/07 18:16:26 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 12] Server 0 voted for Server 2: true
+2020/09/07 18:16:26 Server 1 [Term = 11] received vote request from 2 [Term = 12]
+2020/09/07 18:16:26 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 12] Server 1 voted for Server 2: true
+2020/09/07 18:16:26 [Term 12] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:26 [Term 12] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:26 Server 0 as Candidate time elapsed
+2020/09/07 18:16:26 Server 0 running as candidate
+2020/09/07 18:16:26 [Term 13] Server 0 sending requestVote
+2020/09/07 18:16:26 Server 1 [Term = 12] received vote request from 0 [Term = 13]
+2020/09/07 18:16:26 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 13] Server 1 voted for Server 0: true
+2020/09/07 18:16:26 Server 2 [Term = 12] received vote request from 0 [Term = 13]
+2020/09/07 18:16:26 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 13] Server 2 voted for Server 0: true
+2020/09/07 18:16:26 [Term 13] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:26 [Term 13] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:26 Server 1 as Candidate time elapsed
+2020/09/07 18:16:26 Server 1 running as candidate
+2020/09/07 18:16:26 [Term 14] Server 1 sending requestVote
+2020/09/07 18:16:26 Server 2 [Term = 13] received vote request from 1 [Term = 14]
+2020/09/07 18:16:26 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 Server 0 [Term = 13] received vote request from 1 [Term = 14]
+2020/09/07 18:16:26 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 14] Server 0 voted for Server 1: true
+2020/09/07 18:16:26 [Term 14] Server 2 voted for Server 1: true
+2020/09/07 18:16:26 [Term 14] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:26 [Term 14] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:26 Server 2 as Candidate time elapsed
+2020/09/07 18:16:26 Server 2 running as candidate
+2020/09/07 18:16:26 [Term 15] Server 2 sending requestVote
+2020/09/07 18:16:26 Server 0 [Term = 14] received vote request from 2 [Term = 15]
+2020/09/07 18:16:26 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 15] Server 0 voted for Server 2: true
+2020/09/07 18:16:26 Server 1 [Term = 14] received vote request from 2 [Term = 15]
+2020/09/07 18:16:26 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 15] Server 1 voted for Server 2: true
+2020/09/07 18:16:26 [Term 15] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:26 [Term 15] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:26 Server 0 as Candidate time elapsed
+2020/09/07 18:16:26 Server 0 running as candidate
+2020/09/07 18:16:26 [Term 16] Server 0 sending requestVote
+2020/09/07 18:16:26 Server 1 [Term = 15] received vote request from 0 [Term = 16]
+2020/09/07 18:16:26 Server 2 [Term = 15] received vote request from 0 [Term = 16]
+2020/09/07 18:16:26 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 16] Server 2 voted for Server 0: true
+2020/09/07 18:16:26 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 16] Server 1 voted for Server 0: true
+2020/09/07 18:16:26 [Term 16] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:26 [Term 16] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:26 Server 1 as Candidate time elapsed
+2020/09/07 18:16:26 Server 1 running as candidate
+2020/09/07 18:16:26 [Term 17] Server 1 sending requestVote
+2020/09/07 18:16:26 Server 2 [Term = 16] received vote request from 1 [Term = 17]
+2020/09/07 18:16:26 Server 0 [Term = 16] received vote request from 1 [Term = 17]
+2020/09/07 18:16:26 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 17] Server 0 voted for Server 1: true
+2020/09/07 18:16:26 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:26 [Term 17] Server 2 voted for Server 1: true
+2020/09/07 18:16:26 [Term 17] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:26 [Term 17] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:27 Server 0 as Candidate time elapsed
+2020/09/07 18:16:27 Server 0 running as candidate
+2020/09/07 18:16:27 [Term 18] Server 0 sending requestVote
+2020/09/07 18:16:27 Server 2 [Term = 17] received vote request from 0 [Term = 18]
+2020/09/07 18:16:27 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 18] Server 2 voted for Server 0: true
+2020/09/07 18:16:27 Server 1 [Term = 17] received vote request from 0 [Term = 18]
+2020/09/07 18:16:27 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 18] Server 1 voted for Server 0: true
+2020/09/07 18:16:27 [Term 18] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:27 [Term 18] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:27 Server 2 as Candidate time elapsed
+2020/09/07 18:16:27 Server 2 running as candidate
+2020/09/07 18:16:27 [Term 19] Server 2 sending requestVote
+2020/09/07 18:16:27 Server 0 [Term = 18] received vote request from 2 [Term = 19]
+2020/09/07 18:16:27 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 19] Server 0 voted for Server 2: true
+2020/09/07 18:16:27 Server 1 [Term = 18] received vote request from 2 [Term = 19]
+2020/09/07 18:16:27 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 19] Server 1 voted for Server 2: true
+2020/09/07 18:16:27 [Term 19] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:27 [Term 19] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:27 Server 1 as Candidate time elapsed
+2020/09/07 18:16:27 Server 1 running as candidate
+2020/09/07 18:16:27 [Term 20] Server 1 sending requestVote
+2020/09/07 18:16:27 Server 2 [Term = 19] received vote request from 1 [Term = 20]
+2020/09/07 18:16:27 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 20] Server 2 voted for Server 1: true
+2020/09/07 18:16:27 Server 0 [Term = 19] received vote request from 1 [Term = 20]
+2020/09/07 18:16:27 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 20] Server 0 voted for Server 1: true
+2020/09/07 18:16:27 [Term 20] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:27 [Term 20] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:27 Server 0 as Candidate time elapsed
+2020/09/07 18:16:27 Server 0 running as candidate
+2020/09/07 18:16:27 [Term 21] Server 0 sending requestVote
+2020/09/07 18:16:27 Server 2 [Term = 20] received vote request from 0 [Term = 21]
+2020/09/07 18:16:27 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 21] Server 2 voted for Server 0: true
+2020/09/07 18:16:27 Server 1 [Term = 20] received vote request from 0 [Term = 21]
+2020/09/07 18:16:27 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 21] Server 1 voted for Server 0: true
+2020/09/07 18:16:27 [Term 21] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:27 [Term 21] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:27 Server 2 as Candidate time elapsed
+2020/09/07 18:16:27 Server 2 running as candidate
+2020/09/07 18:16:27 [Term 22] Server 2 sending requestVote
+2020/09/07 18:16:27 Server 0 [Term = 21] received vote request from 2 [Term = 22]
+2020/09/07 18:16:27 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 22] Server 0 voted for Server 2: true
+2020/09/07 18:16:27 Server 1 [Term = 21] received vote request from 2 [Term = 22]
+2020/09/07 18:16:27 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 22] Server 1 voted for Server 2: true
+2020/09/07 18:16:27 [Term 22] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:27 [Term 22] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:27 Server 1 as Candidate time elapsed
+2020/09/07 18:16:27 Server 1 running as candidate
+2020/09/07 18:16:27 [Term 23] Server 1 sending requestVote
+2020/09/07 18:16:27 Server 0 [Term = 22] received vote request from 1 [Term = 23]
+2020/09/07 18:16:27 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 23] Server 0 voted for Server 1: true
+2020/09/07 18:16:27 Server 2 [Term = 22] received vote request from 1 [Term = 23]
+2020/09/07 18:16:27 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 23] Server 2 voted for Server 1: true
+2020/09/07 18:16:27 [Term 23] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:27 [Term 23] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:27 Server 0 as Candidate time elapsed
+2020/09/07 18:16:27 Server 0 running as candidate
+2020/09/07 18:16:27 [Term 24] Server 0 sending requestVote
+2020/09/07 18:16:27 Server 1 [Term = 23] received vote request from 0 [Term = 24]
+2020/09/07 18:16:27 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 24] Server 1 voted for Server 0: true
+2020/09/07 18:16:27 Server 2 [Term = 23] received vote request from 0 [Term = 24]
+2020/09/07 18:16:27 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 24] Server 2 voted for Server 0: true
+2020/09/07 18:16:27 [Term 24] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:27 [Term 24] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:27 Server 2 as Candidate time elapsed
+2020/09/07 18:16:27 Server 2 running as candidate
+2020/09/07 18:16:27 [Term 25] Server 2 sending requestVote
+2020/09/07 18:16:27 Server 1 [Term = 24] received vote request from 2 [Term = 25]
+2020/09/07 18:16:27 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 25] Server 1 voted for Server 2: true
+2020/09/07 18:16:27 Server 0 [Term = 24] received vote request from 2 [Term = 25]
+2020/09/07 18:16:27 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:27 [Term 25] Server 0 voted for Server 2: true
+2020/09/07 18:16:28 [Term 25] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:28 [Term 25] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:28 Server 1 as Candidate time elapsed
+2020/09/07 18:16:28 Server 1 running as candidate
+2020/09/07 18:16:28 [Term 26] Server 1 sending requestVote
+2020/09/07 18:16:28 Server 0 [Term = 25] received vote request from 1 [Term = 26]
+2020/09/07 18:16:28 Server 2 [Term = 25] received vote request from 1 [Term = 26]
+2020/09/07 18:16:28 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 26] Server 2 voted for Server 1: true
+2020/09/07 18:16:28 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 26] Server 0 voted for Server 1: true
+2020/09/07 18:16:28 [Term 26] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:28 [Term 26] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:28 Server 0 as Candidate time elapsed
+2020/09/07 18:16:28 Server 0 running as candidate
+2020/09/07 18:16:28 [Term 27] Server 0 sending requestVote
+2020/09/07 18:16:28 Server 1 [Term = 26] received vote request from 0 [Term = 27]
+2020/09/07 18:16:28 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 27] Server 1 voted for Server 0: true
+2020/09/07 18:16:28 Server 2 [Term = 26] received vote request from 0 [Term = 27]
+2020/09/07 18:16:28 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 27] Server 2 voted for Server 0: true
+2020/09/07 18:16:28 [Term 27] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:28 [Term 27] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:28 Server 2 as Candidate time elapsed
+2020/09/07 18:16:28 Server 2 running as candidate
+2020/09/07 18:16:28 [Term 28] Server 2 sending requestVote
+2020/09/07 18:16:28 Server 0 [Term = 27] received vote request from 2 [Term = 28]
+2020/09/07 18:16:28 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 28] Server 0 voted for Server 2: true
+2020/09/07 18:16:28 Server 1 [Term = 27] received vote request from 2 [Term = 28]
+2020/09/07 18:16:28 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 28] Server 1 voted for Server 2: true
+2020/09/07 18:16:28 [Term 28] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:28 [Term 28] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:28 Server 1 as Candidate time elapsed
+2020/09/07 18:16:28 Server 1 running as candidate
+2020/09/07 18:16:28 [Term 29] Server 1 sending requestVote
+2020/09/07 18:16:28 Server 2 [Term = 28] received vote request from 1 [Term = 29]
+2020/09/07 18:16:28 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 29] Server 2 voted for Server 1: true
+2020/09/07 18:16:28 Server 0 [Term = 28] received vote request from 1 [Term = 29]
+2020/09/07 18:16:28 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 29] Server 0 voted for Server 1: true
+2020/09/07 18:16:28 [Term 29] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:28 [Term 29] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:28 Server 0 as Candidate time elapsed
+2020/09/07 18:16:28 Server 0 running as candidate
+2020/09/07 18:16:28 [Term 30] Server 0 sending requestVote
+2020/09/07 18:16:28 Server 1 [Term = 29] received vote request from 0 [Term = 30]
+2020/09/07 18:16:28 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 Server 2 [Term = 29] received vote request from 0 [Term = 30]
+2020/09/07 18:16:28 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 30] Server 2 voted for Server 0: true
+2020/09/07 18:16:28 [Term 30] Server 1 voted for Server 0: true
+2020/09/07 18:16:28 [Term 30] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:28 [Term 30] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:28 Server 2 as Candidate time elapsed
+2020/09/07 18:16:28 Server 2 running as candidate
+2020/09/07 18:16:28 [Term 31] Server 2 sending requestVote
+2020/09/07 18:16:28 Server 1 [Term = 30] received vote request from 2 [Term = 31]
+2020/09/07 18:16:28 Server 0 [Term = 30] received vote request from 2 [Term = 31]
+2020/09/07 18:16:28 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 31] Server 0 voted for Server 2: true
+2020/09/07 18:16:28 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 31] Server 1 voted for Server 2: true
+2020/09/07 18:16:28 [Term 31] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:28 [Term 31] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:28 Server 1 as Candidate time elapsed
+2020/09/07 18:16:28 Server 1 running as candidate
+2020/09/07 18:16:28 [Term 32] Server 1 sending requestVote
+2020/09/07 18:16:28 Server 0 [Term = 31] received vote request from 1 [Term = 32]
+2020/09/07 18:16:28 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 32] Server 0 voted for Server 1: true
+2020/09/07 18:16:28 Server 2 [Term = 31] received vote request from 1 [Term = 32]
+2020/09/07 18:16:28 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 32] Server 2 voted for Server 1: true
+2020/09/07 18:16:28 [Term 32] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:28 [Term 32] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:28 Server 0 as Candidate time elapsed
+2020/09/07 18:16:28 Server 0 running as candidate
+2020/09/07 18:16:28 [Term 33] Server 0 sending requestVote
+2020/09/07 18:16:28 Server 2 [Term = 32] received vote request from 0 [Term = 33]
+2020/09/07 18:16:28 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 33] Server 2 voted for Server 0: true
+2020/09/07 18:16:28 Server 1 [Term = 32] received vote request from 0 [Term = 33]
+2020/09/07 18:16:28 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:28 [Term 33] Server 1 voted for Server 0: true
+2020/09/07 18:16:28 [Term 33] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:28 [Term 33] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:29 Server 2 as Candidate time elapsed
+2020/09/07 18:16:29 Server 2 running as candidate
+2020/09/07 18:16:29 [Term 34] Server 2 sending requestVote
+2020/09/07 18:16:29 Server 0 [Term = 33] received vote request from 2 [Term = 34]
+2020/09/07 18:16:29 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 34] Server 0 voted for Server 2: true
+2020/09/07 18:16:29 Server 1 [Term = 33] received vote request from 2 [Term = 34]
+2020/09/07 18:16:29 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 34] Server 1 voted for Server 2: true
+2020/09/07 18:16:29 [Term 34] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:29 [Term 34] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:29 Server 1 as Candidate time elapsed
+2020/09/07 18:16:29 Server 1 running as candidate
+2020/09/07 18:16:29 [Term 35] Server 1 sending requestVote
+2020/09/07 18:16:29 Server 0 [Term = 34] received vote request from 1 [Term = 35]
+2020/09/07 18:16:29 Server 2 [Term = 34] received vote request from 1 [Term = 35]
+2020/09/07 18:16:29 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 35] Server 0 voted for Server 1: true
+2020/09/07 18:16:29 [Term 35] Server 2 voted for Server 1: true
+2020/09/07 18:16:29 [Term 35] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:29 [Term 35] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:29 Server 0 as Candidate time elapsed
+2020/09/07 18:16:29 Server 0 running as candidate
+2020/09/07 18:16:29 [Term 36] Server 0 sending requestVote
+2020/09/07 18:16:29 Server 1 [Term = 35] received vote request from 0 [Term = 36]
+2020/09/07 18:16:29 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 36] Server 1 voted for Server 0: true
+2020/09/07 18:16:29 Server 2 [Term = 35] received vote request from 0 [Term = 36]
+2020/09/07 18:16:29 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 36] Server 2 voted for Server 0: true
+2020/09/07 18:16:29 [Term 36] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:29 [Term 36] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:29 Server 2 as Candidate time elapsed
+2020/09/07 18:16:29 Server 2 running as candidate
+2020/09/07 18:16:29 [Term 37] Server 2 sending requestVote
+2020/09/07 18:16:29 Server 0 [Term = 36] received vote request from 2 [Term = 37]
+2020/09/07 18:16:29 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 Server 1 [Term = 36] received vote request from 2 [Term = 37]
+2020/09/07 18:16:29 [Term 37] Server 0 voted for Server 2: true
+2020/09/07 18:16:29 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 37] Server 1 voted for Server 2: true
+2020/09/07 18:16:29 [Term 37] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:29 [Term 37] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:29 Server 1 as Candidate time elapsed
+2020/09/07 18:16:29 Server 1 running as candidate
+2020/09/07 18:16:29 [Term 38] Server 1 sending requestVote
+2020/09/07 18:16:29 Server 0 [Term = 37] received vote request from 1 [Term = 38]
+2020/09/07 18:16:29 Server 2 [Term = 37] received vote request from 1 [Term = 38]
+2020/09/07 18:16:29 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 38] Server 2 voted for Server 1: true
+2020/09/07 18:16:29 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 38] Server 0 voted for Server 1: true
+2020/09/07 18:16:29 [Term 38] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:29 [Term 38] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:29 Server 0 as Candidate time elapsed
+2020/09/07 18:16:29 Server 0 running as candidate
+2020/09/07 18:16:29 [Term 39] Server 0 sending requestVote
+2020/09/07 18:16:29 Server 2 [Term = 38] received vote request from 0 [Term = 39]
+2020/09/07 18:16:29 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 39] Server 2 voted for Server 0: true
+2020/09/07 18:16:29 Server 1 [Term = 38] received vote request from 0 [Term = 39]
+2020/09/07 18:16:29 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 39] Server 1 voted for Server 0: true
+2020/09/07 18:16:29 [Term 39] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:29 [Term 39] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:29 Server 1 as Candidate time elapsed
+2020/09/07 18:16:29 Server 1 running as candidate
+2020/09/07 18:16:29 [Term 40] Server 1 sending requestVote
+2020/09/07 18:16:29 Server 2 [Term = 39] received vote request from 1 [Term = 40]
+2020/09/07 18:16:29 Server 0 [Term = 39] received vote request from 1 [Term = 40]
+2020/09/07 18:16:29 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 40] Server 0 voted for Server 1: true
+2020/09/07 18:16:29 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 40] Server 2 voted for Server 1: true
+2020/09/07 18:16:29 [Term 40] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:29 [Term 40] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:29 Server 2 as Candidate time elapsed
+2020/09/07 18:16:29 Server 2 running as candidate
+2020/09/07 18:16:29 [Term 41] Server 2 sending requestVote
+2020/09/07 18:16:29 Server 0 [Term = 40] received vote request from 2 [Term = 41]
+2020/09/07 18:16:29 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 41] Server 0 voted for Server 2: true
+2020/09/07 18:16:29 [Term 41] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:29 Server 1 [Term = 40] received vote request from 2 [Term = 41]
+2020/09/07 18:16:29 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:29 [Term 41] Server 1 voted for Server 2: true
+2020/09/07 18:16:29 [Term 41] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:30 Server 0 as Candidate time elapsed
+2020/09/07 18:16:30 Server 0 running as candidate
+2020/09/07 18:16:30 [Term 42] Server 0 sending requestVote
+2020/09/07 18:16:30 Server 1 [Term = 41] received vote request from 0 [Term = 42]
+2020/09/07 18:16:30 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 42] Server 1 voted for Server 0: true
+2020/09/07 18:16:30 Server 2 [Term = 41] received vote request from 0 [Term = 42]
+2020/09/07 18:16:30 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 42] Server 2 voted for Server 0: true
+2020/09/07 18:16:30 [Term 42] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:30 [Term 42] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:30 Server 2 as Candidate time elapsed
+2020/09/07 18:16:30 Server 2 running as candidate
+2020/09/07 18:16:30 [Term 43] Server 2 sending requestVote
+2020/09/07 18:16:30 Server 0 [Term = 42] received vote request from 2 [Term = 43]
+2020/09/07 18:16:30 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 43] Server 0 voted for Server 2: true
+2020/09/07 18:16:30 Server 1 [Term = 42] received vote request from 2 [Term = 43]
+2020/09/07 18:16:30 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 43] Server 1 voted for Server 2: true
+2020/09/07 18:16:30 [Term 43] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:30 [Term 43] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:30 Server 1 as Candidate time elapsed
+2020/09/07 18:16:30 Server 1 running as candidate
+2020/09/07 18:16:30 [Term 44] Server 1 sending requestVote
+2020/09/07 18:16:30 Server 0 [Term = 43] received vote request from 1 [Term = 44]
+2020/09/07 18:16:30 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 44] Server 0 voted for Server 1: true
+2020/09/07 18:16:30 Server 2 [Term = 43] received vote request from 1 [Term = 44]
+2020/09/07 18:16:30 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 44] Server 2 voted for Server 1: true
+2020/09/07 18:16:30 [Term 44] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:30 [Term 44] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:30 Server 0 as Candidate time elapsed
+2020/09/07 18:16:30 Server 0 running as candidate
+2020/09/07 18:16:30 [Term 45] Server 0 sending requestVote
+2020/09/07 18:16:30 Server 1 [Term = 44] received vote request from 0 [Term = 45]
+2020/09/07 18:16:30 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 45] Server 1 voted for Server 0: true
+2020/09/07 18:16:30 Server 2 [Term = 44] received vote request from 0 [Term = 45]
+2020/09/07 18:16:30 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 45] Server 2 voted for Server 0: true
+2020/09/07 18:16:30 [Term 45] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:30 [Term 45] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:30 Server 1 as Candidate time elapsed
+2020/09/07 18:16:30 Server 1 running as candidate
+2020/09/07 18:16:30 [Term 46] Server 1 sending requestVote
+2020/09/07 18:16:30 Server 0 [Term = 45] received vote request from 1 [Term = 46]
+2020/09/07 18:16:30 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 Server 2 [Term = 45] received vote request from 1 [Term = 46]
+2020/09/07 18:16:30 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 46] Server 2 voted for Server 1: true
+2020/09/07 18:16:30 [Term 46] Server 0 voted for Server 1: true
+2020/09/07 18:16:30 [Term 46] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:30 [Term 46] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:30 Server 2 as Candidate time elapsed
+2020/09/07 18:16:30 Server 2 running as candidate
+2020/09/07 18:16:30 [Term 47] Server 2 sending requestVote
+2020/09/07 18:16:30 Server 0 [Term = 46] received vote request from 2 [Term = 47]
+2020/09/07 18:16:30 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 47] Server 0 voted for Server 2: true
+2020/09/07 18:16:30 Server 1 [Term = 46] received vote request from 2 [Term = 47]
+2020/09/07 18:16:30 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 47] Server 1 voted for Server 2: true
+2020/09/07 18:16:30 [Term 47] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:30 [Term 47] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:30 Server 0 as Candidate time elapsed
+2020/09/07 18:16:30 Server 0 running as candidate
+2020/09/07 18:16:30 [Term 48] Server 0 sending requestVote
+2020/09/07 18:16:30 Server 1 [Term = 47] received vote request from 0 [Term = 48]
+2020/09/07 18:16:30 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 48] Server 1 voted for Server 0: true
+2020/09/07 18:16:30 [Term 48] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:30 Server 2 [Term = 47] received vote request from 0 [Term = 48]
+2020/09/07 18:16:30 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 48] Server 2 voted for Server 0: true
+2020/09/07 18:16:30 [Term 48] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:30 Server 1 as Candidate time elapsed
+2020/09/07 18:16:30 Server 1 running as candidate
+2020/09/07 18:16:30 [Term 49] Server 1 sending requestVote
+2020/09/07 18:16:30 Server 0 [Term = 48] received vote request from 1 [Term = 49]
+2020/09/07 18:16:30 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 49] Server 0 voted for Server 1: true
+2020/09/07 18:16:30 Server 2 [Term = 48] received vote request from 1 [Term = 49]
+2020/09/07 18:16:30 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:30 [Term 49] Server 2 voted for Server 1: true
+2020/09/07 18:16:30 [Term 49] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:30 [Term 49] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:31 Server 2 as Candidate time elapsed
+2020/09/07 18:16:31 Server 2 running as candidate
+2020/09/07 18:16:31 [Term 50] Server 2 sending requestVote
+2020/09/07 18:16:31 Server 1 [Term = 49] received vote request from 2 [Term = 50]
+2020/09/07 18:16:31 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 50] Server 1 voted for Server 2: true
+2020/09/07 18:16:31 Server 0 [Term = 49] received vote request from 2 [Term = 50]
+2020/09/07 18:16:31 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 50] Server 0 voted for Server 2: true
+2020/09/07 18:16:31 [Term 50] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:31 [Term 50] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:31 Server 0 as Candidate time elapsed
+2020/09/07 18:16:31 Server 0 running as candidate
+2020/09/07 18:16:31 [Term 51] Server 0 sending requestVote
+2020/09/07 18:16:31 Server 2 [Term = 50] received vote request from 0 [Term = 51]
+2020/09/07 18:16:31 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 51] Server 2 voted for Server 0: true
+2020/09/07 18:16:31 Server 1 [Term = 50] received vote request from 0 [Term = 51]
+2020/09/07 18:16:31 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 51] Server 1 voted for Server 0: true
+2020/09/07 18:16:31 [Term 51] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:31 [Term 51] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:31 Server 1 as Candidate time elapsed
+2020/09/07 18:16:31 Server 1 running as candidate
+2020/09/07 18:16:31 [Term 52] Server 1 sending requestVote
+2020/09/07 18:16:31 Server 2 [Term = 51] received vote request from 1 [Term = 52]
+2020/09/07 18:16:31 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 52] Server 2 voted for Server 1: true
+2020/09/07 18:16:31 Server 0 [Term = 51] received vote request from 1 [Term = 52]
+2020/09/07 18:16:31 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 52] Server 0 voted for Server 1: true
+2020/09/07 18:16:31 [Term 52] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:31 [Term 52] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:31 Server 2 as Candidate time elapsed
+2020/09/07 18:16:31 Server 2 running as candidate
+2020/09/07 18:16:31 [Term 53] Server 2 sending requestVote
+2020/09/07 18:16:31 Server 0 [Term = 52] received vote request from 2 [Term = 53]
+2020/09/07 18:16:31 Server 1 [Term = 52] received vote request from 2 [Term = 53]
+2020/09/07 18:16:31 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 53] Server 1 voted for Server 2: true
+2020/09/07 18:16:31 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 53] Server 0 voted for Server 2: true
+2020/09/07 18:16:31 [Term 53] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:31 [Term 53] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:31 Server 0 as Candidate time elapsed
+2020/09/07 18:16:31 Server 0 running as candidate
+2020/09/07 18:16:31 [Term 54] Server 0 sending requestVote
+2020/09/07 18:16:31 Server 2 [Term = 53] received vote request from 0 [Term = 54]
+2020/09/07 18:16:31 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 54] Server 2 voted for Server 0: true
+2020/09/07 18:16:31 Server 1 [Term = 53] received vote request from 0 [Term = 54]
+2020/09/07 18:16:31 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 54] Server 1 voted for Server 0: true
+2020/09/07 18:16:31 [Term 54] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:31 [Term 54] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:31 Server 1 as Candidate time elapsed
+2020/09/07 18:16:31 Server 1 running as candidate
+2020/09/07 18:16:31 [Term 55] Server 1 sending requestVote
+2020/09/07 18:16:31 Server 0 [Term = 54] received vote request from 1 [Term = 55]
+2020/09/07 18:16:31 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 55] Server 0 voted for Server 1: true
+2020/09/07 18:16:31 Server 2 [Term = 54] received vote request from 1 [Term = 55]
+2020/09/07 18:16:31 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 55] Server 2 voted for Server 1: true
+2020/09/07 18:16:31 [Term 55] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:31 [Term 55] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:31 Server 2 as Candidate time elapsed
+2020/09/07 18:16:31 Server 2 running as candidate
+2020/09/07 18:16:31 [Term 56] Server 2 sending requestVote
+2020/09/07 18:16:31 Server 0 [Term = 55] received vote request from 2 [Term = 56]
+2020/09/07 18:16:31 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 56] Server 0 voted for Server 2: true
+2020/09/07 18:16:31 Server 1 [Term = 55] received vote request from 2 [Term = 56]
+2020/09/07 18:16:31 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:31 [Term 56] Server 1 voted for Server 2: true
+2020/09/07 18:16:31 [Term 56] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:31 [Term 56] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 Server 0 as Candidate time elapsed
+2020/09/07 18:16:32 Server 0 running as candidate
+2020/09/07 18:16:32 [Term 57] Server 0 sending requestVote
+2020/09/07 18:16:32 Server 2 [Term = 56] received vote request from 0 [Term = 57]
+2020/09/07 18:16:32 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 Server 1 [Term = 56] received vote request from 0 [Term = 57]
+2020/09/07 18:16:32 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 57] Server 1 voted for Server 0: true
+2020/09/07 18:16:32 [Term 57] Server 2 voted for Server 0: true
+2020/09/07 18:16:32 [Term 57] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 [Term 57] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:32 Server 1 as Candidate time elapsed
+2020/09/07 18:16:32 Server 1 running as candidate
+2020/09/07 18:16:32 [Term 58] Server 1 sending requestVote
+2020/09/07 18:16:32 Server 0 [Term = 57] received vote request from 1 [Term = 58]
+2020/09/07 18:16:32 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 58] Server 0 voted for Server 1: true
+2020/09/07 18:16:32 Server 2 [Term = 57] received vote request from 1 [Term = 58]
+2020/09/07 18:16:32 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 58] Server 2 voted for Server 1: true
+2020/09/07 18:16:32 [Term 58] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:32 [Term 58] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:32 Server 2 as Candidate time elapsed
+2020/09/07 18:16:32 Server 2 running as candidate
+2020/09/07 18:16:32 [Term 59] Server 2 sending requestVote
+2020/09/07 18:16:32 Server 0 [Term = 58] received vote request from 2 [Term = 59]
+2020/09/07 18:16:32 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 59] Server 0 voted for Server 2: true
+2020/09/07 18:16:32 Server 1 [Term = 58] received vote request from 2 [Term = 59]
+2020/09/07 18:16:32 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 59] Server 1 voted for Server 2: true
+2020/09/07 18:16:32 [Term 59] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:32 [Term 59] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 Server 0 as Candidate time elapsed
+2020/09/07 18:16:32 Server 0 running as candidate
+2020/09/07 18:16:32 [Term 60] Server 0 sending requestVote
+2020/09/07 18:16:32 Server 2 [Term = 59] received vote request from 0 [Term = 60]
+2020/09/07 18:16:32 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 Server 1 [Term = 59] received vote request from 0 [Term = 60]
+2020/09/07 18:16:32 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 60] Server 1 voted for Server 0: true
+2020/09/07 18:16:32 [Term 60] Server 2 voted for Server 0: true
+2020/09/07 18:16:32 [Term 60] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 [Term 60] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:32 Server 1 as Candidate time elapsed
+2020/09/07 18:16:32 Server 1 running as candidate
+2020/09/07 18:16:32 [Term 61] Server 1 sending requestVote
+2020/09/07 18:16:32 Server 0 [Term = 60] received vote request from 1 [Term = 61]
+2020/09/07 18:16:32 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 61] Server 0 voted for Server 1: true
+2020/09/07 18:16:32 Server 2 [Term = 60] received vote request from 1 [Term = 61]
+2020/09/07 18:16:32 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 61] Server 2 voted for Server 1: true
+2020/09/07 18:16:32 [Term 61] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:32 [Term 61] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:32 Server 2 as Candidate time elapsed
+2020/09/07 18:16:32 Server 2 running as candidate
+2020/09/07 18:16:32 [Term 62] Server 2 sending requestVote
+2020/09/07 18:16:32 Server 1 [Term = 61] received vote request from 2 [Term = 62]
+2020/09/07 18:16:32 Server 0 [Term = 61] received vote request from 2 [Term = 62]
+2020/09/07 18:16:32 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 62] Server 0 voted for Server 2: true
+2020/09/07 18:16:32 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 62] Server 1 voted for Server 2: true
+2020/09/07 18:16:32 [Term 62] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:32 [Term 62] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 Server 0 as Candidate time elapsed
+2020/09/07 18:16:32 Server 0 running as candidate
+2020/09/07 18:16:32 [Term 63] Server 0 sending requestVote
+2020/09/07 18:16:32 Server 2 [Term = 62] received vote request from 0 [Term = 63]
+2020/09/07 18:16:32 Server 1 [Term = 62] received vote request from 0 [Term = 63]
+2020/09/07 18:16:32 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 63] Server 1 voted for Server 0: true
+2020/09/07 18:16:32 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 63] Server 2 voted for Server 0: true
+2020/09/07 18:16:32 [Term 63] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 [Term 63] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:32 Server 2 as Candidate time elapsed
+2020/09/07 18:16:32 Server 2 running as candidate
+2020/09/07 18:16:32 [Term 64] Server 2 sending requestVote
+2020/09/07 18:16:32 Server 1 [Term = 63] received vote request from 2 [Term = 64]
+2020/09/07 18:16:32 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 64] Server 1 voted for Server 2: true
+2020/09/07 18:16:32 Server 0 [Term = 63] received vote request from 2 [Term = 64]
+2020/09/07 18:16:32 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 64] Server 0 voted for Server 2: true
+2020/09/07 18:16:32 [Term 64] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:32 [Term 64] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:32 Server 1 as Candidate time elapsed
+2020/09/07 18:16:32 Server 1 running as candidate
+2020/09/07 18:16:32 [Term 65] Server 1 sending requestVote
+2020/09/07 18:16:32 Server 2 [Term = 64] received vote request from 1 [Term = 65]
+2020/09/07 18:16:32 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 Server 0 [Term = 64] received vote request from 1 [Term = 65]
+2020/09/07 18:16:32 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:32 [Term 65] Server 2 voted for Server 1: true
+2020/09/07 18:16:32 [Term 65] Server 0 voted for Server 1: true
+2020/09/07 18:16:32 [Term 65] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:32 [Term 65] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:33 Server 0 as Candidate time elapsed
+2020/09/07 18:16:33 Server 0 running as candidate
+2020/09/07 18:16:33 [Term 66] Server 0 sending requestVote
+2020/09/07 18:16:33 Server 1 [Term = 65] received vote request from 0 [Term = 66]
+2020/09/07 18:16:33 Server 2 [Term = 65] received vote request from 0 [Term = 66]
+2020/09/07 18:16:33 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 66] Server 2 voted for Server 0: true
+2020/09/07 18:16:33 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 66] Server 1 voted for Server 0: true
+2020/09/07 18:16:33 [Term 66] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:33 [Term 66] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:33 Server 1 as Candidate time elapsed
+2020/09/07 18:16:33 Server 1 running as candidate
+2020/09/07 18:16:33 [Term 67] Server 1 sending requestVote
+2020/09/07 18:16:33 Server 0 [Term = 66] received vote request from 1 [Term = 67]
+2020/09/07 18:16:33 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 67] Server 0 voted for Server 1: true
+2020/09/07 18:16:33 Server 2 [Term = 66] received vote request from 1 [Term = 67]
+2020/09/07 18:16:33 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 67] Server 2 voted for Server 1: true
+2020/09/07 18:16:33 [Term 67] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:33 [Term 67] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:33 Server 2 as Candidate time elapsed
+2020/09/07 18:16:33 Server 2 running as candidate
+2020/09/07 18:16:33 [Term 68] Server 2 sending requestVote
+2020/09/07 18:16:33 Server 0 [Term = 67] received vote request from 2 [Term = 68]
+2020/09/07 18:16:33 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 68] Server 0 voted for Server 2: true
+2020/09/07 18:16:33 Server 1 [Term = 67] received vote request from 2 [Term = 68]
+2020/09/07 18:16:33 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 68] Server 1 voted for Server 2: true
+2020/09/07 18:16:33 [Term 68] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:33 [Term 68] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:33 Server 0 as Candidate time elapsed
+2020/09/07 18:16:33 Server 0 running as candidate
+2020/09/07 18:16:33 [Term 69] Server 0 sending requestVote
+2020/09/07 18:16:33 Server 1 [Term = 68] received vote request from 0 [Term = 69]
+2020/09/07 18:16:33 Server 2 [Term = 68] received vote request from 0 [Term = 69]
+2020/09/07 18:16:33 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 69] Server 2 voted for Server 0: true
+2020/09/07 18:16:33 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 69] Server 1 voted for Server 0: true
+2020/09/07 18:16:33 [Term 69] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:33 [Term 69] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:33 Server 1 as Candidate time elapsed
+2020/09/07 18:16:33 Server 1 running as candidate
+2020/09/07 18:16:33 [Term 70] Server 1 sending requestVote
+2020/09/07 18:16:33 Server 2 as Candidate time elapsed
+2020/09/07 18:16:33 Server 2 running as candidate
+2020/09/07 18:16:33 [Term 70] Server 2 sending requestVote
+2020/09/07 18:16:33 Server 2 [Term = 70] received vote request from 1 [Term = 70]
+2020/09/07 18:16:33 Server 0 [Term = 69] received vote request from 1 [Term = 70]
+2020/09/07 18:16:33 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 70] Server 0 voted for Server 1: true
+2020/09/07 18:16:33 Already voted for others in the same term
+2020/09/07 18:16:33 [Term 70] Server 1 sent requestVote to Server 2, voteGranted = false
+2020/09/07 18:16:33 [Term 70] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:33 Server 0 [Term = 70] received vote request from 2 [Term = 70]
+2020/09/07 18:16:33 Already voted for others in the same term
+2020/09/07 18:16:33 [Term 70] Server 2 sent requestVote to Server 0, voteGranted = false
+2020/09/07 18:16:33 Server 1 [Term = 70] received vote request from 2 [Term = 70]
+2020/09/07 18:16:33 Already voted for others in the same term
+2020/09/07 18:16:33 [Term 70] Server 2 sent requestVote to Server 1, voteGranted = false
+2020/09/07 18:16:33 Server 0 as Candidate time elapsed
+2020/09/07 18:16:33 Server 0 running as candidate
+2020/09/07 18:16:33 [Term 71] Server 0 sending requestVote
+2020/09/07 18:16:33 Server 2 [Term = 70] received vote request from 0 [Term = 71]
+2020/09/07 18:16:33 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 71] Server 2 voted for Server 0: true
+2020/09/07 18:16:33 Server 1 [Term = 70] received vote request from 0 [Term = 71]
+2020/09/07 18:16:33 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:33 [Term 71] Server 1 voted for Server 0: true
+2020/09/07 18:16:33 [Term 71] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:33 [Term 71] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:34 Server 1 as Candidate time elapsed
+2020/09/07 18:16:34 Server 1 running as candidate
+2020/09/07 18:16:34 [Term 72] Server 1 sending requestVote
+2020/09/07 18:16:34 Server 0 [Term = 71] received vote request from 1 [Term = 72]
+2020/09/07 18:16:34 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 72] Server 0 voted for Server 1: true
+2020/09/07 18:16:34 Server 2 [Term = 71] received vote request from 1 [Term = 72]
+2020/09/07 18:16:34 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 72] Server 2 voted for Server 1: true
+2020/09/07 18:16:34 [Term 72] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:34 [Term 72] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:34 Server 2 as Candidate time elapsed
+2020/09/07 18:16:34 Server 2 running as candidate
+2020/09/07 18:16:34 [Term 73] Server 2 sending requestVote
+2020/09/07 18:16:34 Server 1 [Term = 72] received vote request from 2 [Term = 73]
+2020/09/07 18:16:34 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 73] Server 1 voted for Server 2: true
+2020/09/07 18:16:34 Server 0 [Term = 72] received vote request from 2 [Term = 73]
+2020/09/07 18:16:34 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 73] Server 0 voted for Server 2: true
+2020/09/07 18:16:34 [Term 73] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:34 [Term 73] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:34 Server 0 as Candidate time elapsed
+2020/09/07 18:16:34 Server 0 running as candidate
+2020/09/07 18:16:34 [Term 74] Server 0 sending requestVote
+2020/09/07 18:16:34 Server 1 [Term = 73] received vote request from 0 [Term = 74]
+2020/09/07 18:16:34 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 Server 2 [Term = 73] received vote request from 0 [Term = 74]
+2020/09/07 18:16:34 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 74] Server 2 voted for Server 0: true
+2020/09/07 18:16:34 [Term 74] Server 1 voted for Server 0: true
+2020/09/07 18:16:34 [Term 74] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:34 [Term 74] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:34 Server 1 as Candidate time elapsed
+2020/09/07 18:16:34 Server 1 running as candidate
+2020/09/07 18:16:34 [Term 75] Server 1 sending requestVote
+2020/09/07 18:16:34 Server 0 [Term = 74] received vote request from 1 [Term = 75]
+2020/09/07 18:16:34 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 75] Server 0 voted for Server 1: true
+2020/09/07 18:16:34 Server 2 [Term = 74] received vote request from 1 [Term = 75]
+2020/09/07 18:16:34 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 75] Server 2 voted for Server 1: true
+2020/09/07 18:16:34 [Term 75] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:34 [Term 75] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:34 Server 2 as Candidate time elapsed
+2020/09/07 18:16:34 Server 2 running as candidate
+2020/09/07 18:16:34 [Term 76] Server 2 sending requestVote
+2020/09/07 18:16:34 Server 1 [Term = 75] received vote request from 2 [Term = 76]
+2020/09/07 18:16:34 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 76] Server 1 voted for Server 2: true
+2020/09/07 18:16:34 Server 0 [Term = 75] received vote request from 2 [Term = 76]
+2020/09/07 18:16:34 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 76] Server 0 voted for Server 2: true
+2020/09/07 18:16:34 [Term 76] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:34 [Term 76] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:34 Server 0 as Candidate time elapsed
+2020/09/07 18:16:34 Server 0 running as candidate
+2020/09/07 18:16:34 [Term 77] Server 0 sending requestVote
+2020/09/07 18:16:34 Server 2 [Term = 76] received vote request from 0 [Term = 77]
+2020/09/07 18:16:34 Server 1 [Term = 76] received vote request from 0 [Term = 77]
+2020/09/07 18:16:34 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 77] Server 1 voted for Server 0: true
+2020/09/07 18:16:34 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 77] Server 2 voted for Server 0: true
+2020/09/07 18:16:34 [Term 77] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:34 [Term 77] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:34 Server 1 as Candidate time elapsed
+2020/09/07 18:16:34 Server 1 running as candidate
+2020/09/07 18:16:34 [Term 78] Server 1 sending requestVote
+2020/09/07 18:16:34 Server 0 [Term = 77] received vote request from 1 [Term = 78]
+2020/09/07 18:16:34 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 78] Server 0 voted for Server 1: true
+2020/09/07 18:16:34 Server 2 [Term = 77] received vote request from 1 [Term = 78]
+2020/09/07 18:16:34 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 78] Server 2 voted for Server 1: true
+2020/09/07 18:16:34 [Term 78] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:34 [Term 78] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:34 Server 2 as Candidate time elapsed
+2020/09/07 18:16:34 Server 2 running as candidate
+2020/09/07 18:16:34 [Term 79] Server 2 sending requestVote
+2020/09/07 18:16:34 Server 1 [Term = 78] received vote request from 2 [Term = 79]
+2020/09/07 18:16:34 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 79] Server 1 voted for Server 2: true
+2020/09/07 18:16:34 Server 0 [Term = 78] received vote request from 2 [Term = 79]
+2020/09/07 18:16:34 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:34 [Term 79] Server 0 voted for Server 2: true
+2020/09/07 18:16:34 [Term 79] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:34 [Term 79] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:35 Server 1 as Candidate time elapsed
+2020/09/07 18:16:35 Server 1 running as candidate
+2020/09/07 18:16:35 [Term 80] Server 1 sending requestVote
+2020/09/07 18:16:35 Server 0 [Term = 79] received vote request from 1 [Term = 80]
+2020/09/07 18:16:35 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 80] Server 0 voted for Server 1: true
+2020/09/07 18:16:35 Server 2 [Term = 79] received vote request from 1 [Term = 80]
+2020/09/07 18:16:35 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 80] Server 2 voted for Server 1: true
+2020/09/07 18:16:35 [Term 80] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:35 [Term 80] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:35 Get State on Server 0, state = FOLLOWER
+2020/09/07 18:16:35 Server 0 has term 80
+2020/09/07 18:16:35 Get State on Server 1, state = LEADER
+2020/09/07 18:16:35 Server 1 has term 80
+2020/09/07 18:16:35 Get State on Server 2, state = FOLLOWER
+2020/09/07 18:16:35 Server 2 has term 80
+warning: term changed even though there were no failures2020/09/07 18:16:35 Server 0 as Candidate time elapsed
+2020/09/07 18:16:35 Server 0 running as candidate
+2020/09/07 18:16:35 [Term 81] Server 0 sending requestVote
+2020/09/07 18:16:35 Server 1 [Term = 80] received vote request from 0 [Term = 81]
+2020/09/07 18:16:35 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 81] Server 1 voted for Server 0: true
+2020/09/07 18:16:35 Server 2 [Term = 80] received vote request from 0 [Term = 81]
+2020/09/07 18:16:35 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 81] Server 2 voted for Server 0: true
+2020/09/07 18:16:35 [Term 81] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:35 [Term 81] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:35 Server 2 as Candidate time elapsed
+2020/09/07 18:16:35 Server 2 running as candidate
+2020/09/07 18:16:35 [Term 82] Server 2 sending requestVote
+2020/09/07 18:16:35 Server 0 [Term = 81] received vote request from 2 [Term = 82]
+2020/09/07 18:16:35 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 82] Server 0 voted for Server 2: true
+2020/09/07 18:16:35 Server 1 [Term = 81] received vote request from 2 [Term = 82]
+2020/09/07 18:16:35 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 82] Server 1 voted for Server 2: true
+2020/09/07 18:16:35 [Term 82] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:35 [Term 82] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:35 Server 1 as Candidate time elapsed
+2020/09/07 18:16:35 Server 1 running as candidate
+2020/09/07 18:16:35 [Term 83] Server 1 sending requestVote
+2020/09/07 18:16:35 Server 0 [Term = 82] received vote request from 1 [Term = 83]
+2020/09/07 18:16:35 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 83] Server 0 voted for Server 1: true
+2020/09/07 18:16:35 [Term 83] Server 1 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:35 Server 2 [Term = 82] received vote request from 1 [Term = 83]
+2020/09/07 18:16:35 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 83] Server 2 voted for Server 1: true
+2020/09/07 18:16:35 [Term 83] Server 1 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:35 Server 2 as Candidate time elapsed
+2020/09/07 18:16:35 Server 2 running as candidate
+2020/09/07 18:16:35 [Term 84] Server 2 sending requestVote
+2020/09/07 18:16:35 Server 1 [Term = 83] received vote request from 2 [Term = 84]
+2020/09/07 18:16:35 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 84] Server 1 voted for Server 2: true
+2020/09/07 18:16:35 Server 0 [Term = 83] received vote request from 2 [Term = 84]
+2020/09/07 18:16:35 Server 0 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 84] Server 0 voted for Server 2: true
+2020/09/07 18:16:35 [Term 84] Server 2 sent requestVote to Server 0, voteGranted = true
+2020/09/07 18:16:35 [Term 84] Server 2 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:35 Server 0 as Candidate time elapsed
+2020/09/07 18:16:35 Server 0 running as candidate
+2020/09/07 18:16:35 [Term 85] Server 0 sending requestVote
+2020/09/07 18:16:35 Server 2 [Term = 84] received vote request from 0 [Term = 85]
+2020/09/07 18:16:35 Server 2 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 85] Server 2 voted for Server 0: true
+2020/09/07 18:16:35 Server 1 [Term = 84] received vote request from 0 [Term = 85]
+2020/09/07 18:16:35 Server 1 is stale and received request vote, converting to follower
+2020/09/07 18:16:35 [Term 85] Server 1 voted for Server 0: true
+2020/09/07 18:16:35 [Term 85] Server 0 sent requestVote to Server 2, voteGranted = true
+2020/09/07 18:16:35 [Term 85] Server 0 sent requestVote to Server 1, voteGranted = true
+2020/09/07 18:16:35 Get State on Server 0, state = LEADER
+2020/09/07 18:16:35 Get State on Server 1, state = FOLLOWER
+2020/09/07 18:16:35 Get State on Server 2, state = FOLLOWER
+  ... Passed --  11.0  3  172   27834    0
+PASS
+ok  	_/home/gxsong/mit_distributed_systems_lab/6.824/src/raft	11.026s
