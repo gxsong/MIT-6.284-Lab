@@ -64,31 +64,34 @@ type LogEntry struct {
 // A Go object implementing a single Raft peer.
 //
 type Raft struct {
-	mu          sync.Mutex          // Lock to protect shared access to this peer's state
-	peers       []*labrpc.ClientEnd // RPC end points of all peers
-	persister   *Persister          // Object to hold this peer's persisted state
-	me          int                 // this peer's index into peers[]
-	dead        int32               // set by Kill()
-	serverState ServerState
-	currentTerm int
-	votedFor    int
-	log         []LogEntry
-	commitIndex int
-	lastApplied int
-	nextIndex   []int
-	matchIndex  []int
-	timer       *time.Timer
-	totalVotes  int
+	mu             sync.Mutex          // Lock to protect shared access to this peer's state
+	peers          []*labrpc.ClientEnd // RPC end points of all peers
+	persister      *Persister          // Object to hold this peer's persisted state
+	me             int                 // this peer's index into peers[]
+	dead           int32               // set by Kill()
+	serverState    ServerState
+	currentTerm    int
+	votedFor       int
+	log            []LogEntry
+	commitIndex    int
+	lastApplied    int
+	nextIndex      []int
+	matchIndex     []int
+	timer          *time.Timer
+	totalVotes     int
+	heartbeatRcvCh chan bool
+	voteGrantedCh  chan bool
+	winElecCh      chan bool
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
-
 }
 
 func (rf *Raft) saveFollowerState(term int, voteFor int) {
 	rf.currentTerm = term
 	rf.serverState = FOLLOWER
 	rf.votedFor = voteFor
+	rf.totalVotes = 0
 	rf.persist()
 }
 
@@ -96,6 +99,7 @@ func (rf *Raft) saveCandidateState() {
 	rf.serverState = CANDIDATE
 	rf.currentTerm++
 	rf.votedFor = rf.me
+	rf.totalVotes = 1
 	rf.persist()
 }
 
@@ -113,6 +117,10 @@ func (rf *Raft) runAsFollower() {
 		rf.saveCandidateState()
 		rf.mu.Unlock()
 		return
+	case <-rf.voteGrantedCh:
+		DPrintf("Server %d as Follower granted vote", rf.me)
+	case <-rf.heartbeatRcvCh:
+		DPrintf("Server %d as Follower received heartbeat", rf.me)
 	}
 }
 
@@ -166,6 +174,7 @@ func (rf *Raft) runAsCandidate() {
 					rf.totalVotes++
 					if rf.totalVotes > len(rf.peers)/2 && rf.serverState == CANDIDATE {
 						rf.saveLeaderState()
+						rf.winElecCh <- true
 					}
 				}
 				rf.mu.Unlock()
@@ -174,40 +183,54 @@ func (rf *Raft) runAsCandidate() {
 	}()
 	select {
 	case <-rf.timer.C:
-		DPrintf("Server %d as Candidate time elapsed", rf.me)
+		// in case of split vote, start a new term
 		rf.mu.Lock()
 		rf.saveCandidateState()
 		rf.mu.Unlock()
-		return
+		DPrintf("Server %d as Candidate time elapsed", rf.me)
+	case <-rf.winElecCh:
+		DPrintf("Server %d as Candidate won election, exiting", rf.me)
+	case <-rf.heartbeatRcvCh:
+		DPrintf("Server %d as Candidate received heartbeat", rf.me)
 	}
 }
 
 func (rf *Raft) runAsLeader() {
 	DPrintf("Server %d running as leader", rf.me)
+	rf.mu.Lock()
+	if rf.serverState != LEADER {
+		DPrintf("Server %d [Term %d] as a Leader already became a follower, exiting", rf.me, rf.currentTerm)
+		rf.mu.Unlock()
+		return
+	}
+	rf.mu.Unlock()
+	DPrintf("Server %d as Leader checked state, remains Leader", rf.me)
 	for peerID := range rf.peers {
-		DPrintf("Server %d sending heartbeat to Server %d", rf.me, peerID)
 		go func(peerID int) {
 			if peerID == rf.me {
 				return
 			}
+			DPrintf("Server %d sending heartbeat to Server %d", rf.me, peerID)
 			// TODO: populate arg fields for actual log update, currently only for heartbeat
 			rf.mu.Lock()
-			defer rf.mu.Unlock()
 			args, reply := AppendEntriesArgs{Term: rf.currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, AppendEntriesReply{}
-			// rf.mu.Unlock()
+			rf.mu.Unlock()
 			ok := rf.sendAppendEntries(peerID, &args, &reply)
 			if !ok {
 				DPrintf("Server %d failed sending appendEntries to Server %d", rf.me, peerID)
 				return
 			}
-			DPrintf("Server %d got heartbeat reply, reply.Term = %d, currentTerm = %d", rf.me, reply.Term, rf.currentTerm)
+			rf.mu.Lock()
+			defer rf.mu.Unlock()
+			DPrintf("Server %d got heartbeat reply from Server %d, reply.Term = %d, currentTerm = %d", rf.me, peerID, reply.Term, rf.currentTerm)
 			if reply.Term > rf.currentTerm {
 				DPrintf("Server %d as leader is stale, in %d", rf.me, peerID)
 				rf.currentTerm = reply.Term
 				rf.saveFollowerState(rf.currentTerm, -1)
 			}
+			DPrintf("Server %d returned from goroutine heartbeat to Server %d", rf.me, peerID)
 		}(peerID)
-		DPrintf("Server %d returned from goroutine heartbeat to Server %d", rf.me, peerID)
+
 	}
 }
 
@@ -279,13 +302,15 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.mu.Lock()
 	DPrintf("Server %d [Term %d] received heartbeat from Server %d [Term %d]", rf.me, rf.currentTerm, args.LeaderID, args.Term)
 	if args.Term < rf.currentTerm {
+		DPrintf("Server %d [Term %d] received heartbeat from Stale Leader Server %d [Term %d]", rf.me, rf.currentTerm, args.LeaderID, args.Term)
 		// requestor is stale, no need to reset timer
 		reply.Term = rf.currentTerm
 		reply.Success = false
 		rf.mu.Unlock()
 		return
 	}
-
+	rf.saveFollowerState(args.Term, args.LeaderID)
+	rf.heartbeatRcvCh <- true
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	rf.votedFor = args.LeaderID
 	rf.currentTerm = args.Term
@@ -359,6 +384,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		reply.Term = rf.currentTerm
 		reply.VoteGranted = true
 		rf.votedFor = args.CandidateID
+		rf.voteGrantedCh <- true
 		rf.persist()
 	}
 
@@ -446,7 +472,7 @@ func (rf *Raft) killed() bool {
 }
 
 func genRandomTimeDuration() int {
-	return rand.Intn(150) + 300
+	return rand.Intn(300) + 200
 }
 
 //
@@ -468,6 +494,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 	DPrintf("Make Server %d", rf.me)
 	// Your initialization code here (2A, 2B, 2C).
+	rf.heartbeatRcvCh = make(chan bool, 100)
+	rf.voteGrantedCh = make(chan bool, 100)
+	rf.winElecCh = make(chan bool, 100)
 	rf.log = make([]LogEntry, 0)
 	rf.nextIndex = make([]int, 0)
 	rf.matchIndex = make([]int, 0)
@@ -493,7 +522,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 				rf.runAsCandidate()
 			case state == LEADER:
 				rf.runAsLeader()
-				time.Sleep(150 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}()
