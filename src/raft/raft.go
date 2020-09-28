@@ -19,7 +19,9 @@ package raft
 
 import (
 	"log"
+	"math"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -107,6 +109,16 @@ func (rf *Raft) saveLeaderState() {
 	rf.serverState = LEADER
 }
 
+func (rf *Raft) startApplyLogs() {
+	for rf.lastApplied < rf.commitIndex {
+		msg := ApplyMsg{}
+		msg.CommandIndex = rf.lastApplied + 1
+		msg.Command = rf.log[msg.CommandIndex].Command
+		rf.applyCh <- msg
+		rf.lastApplied++
+	}
+}
+
 func (rf *Raft) runAsFollower() {
 	DPrintf("Server %d running as follower", rf.me)
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
@@ -160,13 +172,11 @@ func (rf *Raft) runAsCandidate() {
 				if reply.Term > rf.currentTerm {
 					rf.currentTerm = reply.Term
 					rf.saveFollowerState(rf.currentTerm, -1)
-					rf.mu.Unlock()
 					return
 				}
 				// in case of 2 requestVote go routines races and one of them got reply.Term > rf.currentTerm
 				// then rf.currentTerm will be updated and serverState will be FOLLOWER
 				if rf.currentTerm != args.Term || rf.serverState != CANDIDATE {
-					rf.mu.Unlock()
 					return
 				}
 				// check state in case it has already been converted to leader
@@ -216,6 +226,8 @@ func (rf *Raft) runAsLeader() {
 			args, reply := AppendEntriesArgs{Term: rf.currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, AppendEntriesReply{}
 			rf.mu.Unlock()
 			ok := rf.sendAppendEntries(peerID, &args, &reply)
+			rf.mu.Lock()
+			defer rf.mu.Unlock()
 			if !ok {
 				DPrintf("Server %d failed sending appendEntries to Server %d", rf.me, peerID)
 				return
@@ -227,10 +239,34 @@ func (rf *Raft) runAsLeader() {
 				DPrintf("Server %d as leader is stale, in %d", rf.me, peerID)
 				rf.currentTerm = reply.Term
 				rf.saveFollowerState(rf.currentTerm, -1)
+				return
+			}
+			if args.Term != rf.currentTerm || rf.serverState != LEADER {
+				DPrintf("Server %d has been changed state while sending appendEntries to server %d, returning", rf.me, peerID)
+				return
+			}
+			if reply.Success {
+				rf.matchIndex[peerID] = prevLogIndex + len(args.Entries)
+				rf.nextIndex[peerID] = rf.matchIndex[peerID] + 1
+				// If there exists an N such that N > commitIndex, a majority
+				// of matchIndex[i] ≥ N, and log[N].term == currentTerm:
+				// set commitIndex = N
+				sortedMatchIndex := make([]int, len(rf.peers))
+				copy(sortedMatchIndex, rf.matchIndex)
+				sortedMatchIndex[rf.me] = len(rf.log)
+				sort.Ints(sortedMatchIndex)
+				N := sortedMatchIndex[len(rf.peers)/2]
+				if N > rf.commitIndex && rf.log[N-1].Term == rf.currentTerm {
+					rf.commitIndex = N
+				}
+				DPrintf("Server %d successfully appended Entries to follower %d", rf.me, peerID)
+				rf.startApplyLogs()
+			} else {
+				rf.nextIndex[peerID] = int(math.Min(float64(reply.NextTryIndex), float64(len(rf.log)-1)))
+				DPrintf("Server %d failed appending Entries to follower %d", rf.me, peerID)
 			}
 			DPrintf("Server %d returned from goroutine heartbeat to Server %d", rf.me, peerID)
 		}(peerID)
-
 	}
 }
 
@@ -292,30 +328,61 @@ type AppendEntriesArgs struct {
 }
 
 type AppendEntriesReply struct {
-	Term    int
-	Success bool
+	Term         int
+	Success      bool
+	NextTryIndex int
+	ConflictTerm int
 }
 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
-	// reset election timeout upon receive
-
 	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	DPrintf("Server %d [Term %d] received heartbeat from Server %d [Term %d]", rf.me, rf.currentTerm, args.LeaderID, args.Term)
 	if args.Term < rf.currentTerm {
 		DPrintf("Server %d [Term %d] received heartbeat from Stale Leader Server %d [Term %d]", rf.me, rf.currentTerm, args.LeaderID, args.Term)
 		// requestor is stale, no need to reset timer
 		reply.Term = rf.currentTerm
+		reply.NextTryIndex = len(rf.log)
 		reply.Success = false
-		rf.mu.Unlock()
 		return
 	}
 	rf.saveFollowerState(args.Term, args.LeaderID)
 	rf.heartbeatRcvCh <- true
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	rf.votedFor = args.LeaderID
-	rf.currentTerm = args.Term
 	reply.Term = rf.currentTerm
-	rf.mu.Unlock()
+	if args.PrevLogIndex > len(rf.log)-1 {
+		reply.NextTryIndex = len(rf.log)
+		reply.Success = false
+		reply.ConflictTerm = -1
+		return
+	}
+	if args.PrevLogTerm != rf.log[args.PrevLogIndex].Term {
+		// optimization: if last log term doesn't agree, find the first entry with this conflict term and retry from there
+		reply.Success = false
+		reply.ConflictTerm = rf.log[args.PrevLogIndex].Term
+		for i := 0; i <= args.PrevLogIndex; i++ {
+			if rf.log[i].Term == rf.log[args.PrevLogIndex].Term {
+				reply.NextTryIndex = i
+				break
+			}
+		}
+	} else {
+		reply.Success = true
+		if args.PrevLogIndex+1+len(args.Entries) < len(rf.log) {
+			for i := 0; i < len(args.Entries); i++ {
+				if args.Entries[i] != rf.log[args.PrevLogIndex+1+i] {
+					rf.log = append(rf.log[:args.PrevLogIndex+1+i], args.Entries[i:]...)
+					break
+				}
+			}
+		} else {
+			rf.log = append(rf.log[:args.PrevLogIndex+1], args.Entries...)
+		}
+		if args.LeaderCommit > rf.commitIndex {
+			rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(len(rf.log))))
+		}
+		rf.startApplyLogs()
+	}
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -441,12 +508,18 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	index := -1
-	term := -1
-	isLeader := true
-
-	// Your code here (2B).
-
+	term := rf.currentTerm
+	isLeader := rf.serverState == LEADER
+	if isLeader {
+		DPrintf("Server %d: got a new Start task, command: %v\n", rf.me, command)
+		rf.log = append(rf.log, LogEntry{Term: term, Command: command})
+		index = len(rf.log) - 1
+		rf.persist()
+	}
+	DPrintf("Server %d returning from Start()", rf.me)
 	return index, term, isLeader
 }
 
@@ -491,6 +564,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
+	rf.applyCh = applyCh
 	rf.me = me
 	DPrintf("Make Server %d", rf.me)
 	// Your initialization code here (2A, 2B, 2C).
@@ -518,8 +592,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 			switch {
 			case state == FOLLOWER:
 				rf.runAsFollower()
+				DPrintf("Server %d returned as follower", rf.me)
 			case state == CANDIDATE:
 				rf.runAsCandidate()
+				DPrintf("Server %d returned as candidate", rf.me)
 			case state == LEADER:
 				rf.runAsLeader()
 				time.Sleep(100 * time.Millisecond)
