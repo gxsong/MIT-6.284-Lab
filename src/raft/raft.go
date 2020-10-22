@@ -135,11 +135,7 @@ func (rf *Raft) runAsCandidate() {
 			rf.mu.Unlock()
 			return
 		}
-		lastIdx := len(rf.log) - 1
-		lastTerm := 0
-		if lastIdx != -1 {
-			lastTerm = rf.log[lastIdx].Term
-		}
+		lastTerm, lastIdx := rf.getLastLogTermAndIndex()
 		args := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}
 		DPrintf("[Term %d] Server %d sending requestVote", rf.currentTerm, rf.me)
 		rf.mu.Unlock()
@@ -213,7 +209,9 @@ func (rf *Raft) runAsLeader() {
 			DPrintf("Server %d sending heartbeat to Server %d", rf.me, peerID)
 			// TODO: populate arg fields for actual log update, currently only for heartbeat
 			rf.mu.Lock()
-			args, reply := AppendEntriesArgs{Term: rf.currentTerm, LeaderID: rf.me, PrevLogIndex: 0}, AppendEntriesReply{}
+			lastTerm, lastIndex := rf.getLastLogTermAndIndex()
+			entries := rf.log[rf.nextIndex[peerID]:]
+			args, reply := AppendEntriesArgs{rf.currentTerm, rf.me, lastIndex, lastTerm, entries, rf.commitIndex}, AppendEntriesReply{}
 			rf.mu.Unlock()
 			ok := rf.sendAppendEntries(peerID, &args, &reply)
 			if !ok {
@@ -280,6 +278,15 @@ func (rf *Raft) readPersist(data []byte) {
 	//   rf.xxx = xxx
 	//   rf.yyy = yyy
 	// }
+}
+
+func (rf *Raft) getLastLogTermAndIndex() (int, int) {
+	lastIdx := len(rf.log) - 1
+	lastTerm := rf.currentTerm
+	if lastIdx != -1 {
+		lastTerm = rf.log[lastIdx].Term
+	}
+	return lastTerm, lastIdx
 }
 
 type AppendEntriesArgs struct {
@@ -371,11 +378,8 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		rf.saveFollowerState(args.Term, rf.votedFor)
 		DPrintf("Server %d is stale and received request vote, converting to follower", rf.me)
 	}
-	lastIdx := len(rf.log) - 1
-	lastTerm := 0
-	if lastIdx != -1 {
-		lastTerm = rf.log[lastIdx].Term
-	}
+
+	lastTerm, lastIdx := rf.getLastLogTermAndIndex()
 
 	if args.LastLogTerm < lastTerm || args.LastLogTerm == lastTerm && args.LastLogIndex < lastIdx {
 		reply.Term = rf.currentTerm
@@ -441,11 +445,14 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 // the leader.
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
-	index := -1
-	term := -1
-	isLeader := true
-
-	// Your code here (2B).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	term, index, isLeader := -1, -1, rf.serverState == LEADER
+	if isLeader {
+		rf.log = append(rf.log, LogEntry{rf.currentTerm, command})
+		term = rf.currentTerm
+		index = len(rf.log) - 1
+	}
 
 	return index, term, isLeader
 }
