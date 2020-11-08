@@ -18,17 +18,16 @@ package raft
 //
 
 import (
+	"bytes"
 	"math"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"../labgob"
 	"../labrpc"
 )
-
-// import "bytes"
-// import "../labgob"
 
 type ServerState string
 
@@ -155,8 +154,7 @@ func (rf *Raft) runAsCandidate() {
 				rf.mu.Lock()
 				DPrintf("[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", rf.currentTerm, rf.me, peerID, reply.VoteGranted)
 				if reply.Term > rf.currentTerm {
-					rf.currentTerm = reply.Term
-					rf.saveFollowerState(rf.currentTerm, -1)
+					rf.saveFollowerState(reply.Term, -1)
 					rf.mu.Unlock()
 					return
 				}
@@ -234,8 +232,7 @@ func (rf *Raft) runAsLeader() {
 			DPrintf("Server %d got heartbeat reply from Server %d, reply.Term = %d, currentTerm = %d", rf.me, peerID, reply.Term, rf.currentTerm)
 			if reply.Term > rf.currentTerm {
 				DPrintf("Server %d as leader is stale, in %d", rf.me, peerID)
-				rf.currentTerm = reply.Term
-				rf.saveFollowerState(rf.currentTerm, -1)
+				rf.saveFollowerState(reply.Term, -1)
 			}
 			if reply.Success {
 				rf.nextIndex[peerID] += len(args.Entries) // really?
@@ -285,14 +282,13 @@ func (rf *Raft) GetState() (int, bool) {
 // see paper's Figure 2 for a description of what should be persistent.
 //
 func (rf *Raft) persist() {
-	// Your code here (2C).
-	// Example:
-	// w := new(bytes.Buffer)
-	// e := labgob.NewEncoder(w)
-	// e.Encode(rf.xxx)
-	// e.Encode(rf.yyy)
-	// data := w.Bytes()
-	// rf.persister.SaveRaftState(data)
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(rf.currentTerm)
+	e.Encode(rf.votedFor)
+	e.Encode(rf.log)
+	data := w.Bytes()
+	rf.persister.SaveRaftState(data)
 }
 
 //
@@ -300,21 +296,23 @@ func (rf *Raft) persist() {
 //
 func (rf *Raft) readPersist(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
-		return
+		rf.log = make([]LogEntry, 0)
+		rf.log = append(rf.log, LogEntry{-1, 0})
+		rf.votedFor = -1
 	}
-	// Your code here (2C).
-	// Example:
-	// r := bytes.NewBuffer(data)
-	// d := labgob.NewDecoder(r)
-	// var xxx
-	// var yyy
-	// if d.Decode(&xxx) != nil ||
-	//    d.Decode(&yyy) != nil {
-	//   error...
-	// } else {
-	//   rf.xxx = xxx
-	//   rf.yyy = yyy
-	// }
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+	var currentTerm int
+	var votedFor int
+	var log []LogEntry
+	if d.Decode(&currentTerm) != nil ||
+		d.Decode(&votedFor) != nil || d.Decode(&log) != nil {
+		DPrintf("Server %d failed to read state from persister", rf.me)
+	} else {
+		rf.currentTerm = currentTerm
+		rf.votedFor = votedFor
+		rf.log = log
+	}
 }
 
 func (rf *Raft) getLastLogTermAndIndex() (int, int) {
@@ -357,8 +355,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	rf.saveFollowerState(args.Term, args.LeaderID)
 	rf.heartbeatRcvCh <- true
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	rf.votedFor = args.LeaderID
-	rf.currentTerm = args.Term
 	reply.Term = rf.currentTerm
 
 	// reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
@@ -391,6 +387,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		}
 		if hasConflict || len(rf.log[args.PrevLogIndex+1:]) < len(args.Entries) {
 			rf.log = append(rf.log[:args.PrevLogIndex+1], args.Entries...)
+			rf.persist()
 		}
 	}
 	DPrintf("Server %d [Term %d] has log entries %v", rf.me, rf.currentTerm, rf.log)
@@ -543,6 +540,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 		rf.log = append(rf.log, LogEntry{rf.currentTerm, command})
 		term = rf.currentTerm
 		index = len(rf.log) - 1
+		rf.persist()
 	}
 
 	return index, term, isLeader
@@ -592,12 +590,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 	rf.applyCh = applyCh
 	DPrintf("Make Server %d", rf.me)
-	// Your initialization code here (2A, 2B, 2C).
 	rf.heartbeatRcvCh = make(chan bool, 100)
 	rf.voteGrantedCh = make(chan bool, 100)
 	rf.winElecCh = make(chan bool, 100)
-	rf.log = make([]LogEntry, 0)
-	rf.log = append(rf.log, LogEntry{-1, 0})
 	rf.nextIndex = make([]int, len(rf.peers))
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.totalVotes = 0
