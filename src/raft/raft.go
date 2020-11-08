@@ -19,6 +19,7 @@ package raft
 
 import (
 	"bytes"
+	"encoding/gob"
 	"math"
 	"math/rand"
 	"sync"
@@ -295,24 +296,15 @@ func (rf *Raft) persist() {
 // restore previously persisted state.
 //
 func (rf *Raft) readPersist(data []byte) {
-	if data == nil || len(data) < 1 { // bootstrap without any state?
-		rf.log = make([]LogEntry, 0)
-		rf.log = append(rf.log, LogEntry{-1, 0})
-		rf.votedFor = -1
+	if data == nil || len(data) < 1 {
+		return
 	}
+
 	r := bytes.NewBuffer(data)
-	d := labgob.NewDecoder(r)
-	var currentTerm int
-	var votedFor int
-	var log []LogEntry
-	if d.Decode(&currentTerm) != nil ||
-		d.Decode(&votedFor) != nil || d.Decode(&log) != nil {
-		DPrintf("Server %d failed to read state from persister", rf.me)
-	} else {
-		rf.currentTerm = currentTerm
-		rf.votedFor = votedFor
-		rf.log = log
-	}
+	d := gob.NewDecoder(r)
+	d.Decode(&rf.currentTerm)
+	d.Decode(&rf.votedFor)
+	d.Decode(&rf.log)
 }
 
 func (rf *Raft) getLastLogTermAndIndex() (int, int) {
@@ -353,8 +345,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		return
 	}
 	rf.saveFollowerState(args.Term, args.LeaderID)
+	// log.Printf("===Before=== Term = %d, votedFor = %d", rf.currentTerm, rf.votedFor)
 	rf.heartbeatRcvCh <- true
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	// TODO: debug why these two lines can't be removed, since the logic is duplicated in saveFollowerState()
+	rf.votedFor = args.LeaderID
+	rf.currentTerm = args.Term
 	reply.Term = rf.currentTerm
 
 	// reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
@@ -366,9 +362,10 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		return
 	}
 
+	reply.NextAttemptIdx = args.PrevLogIndex
 	if args.PrevLogIndex > 0 && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
 		term := rf.log[args.PrevLogTerm].Term
-		reply.NextAttemptIdx = args.PrevLogIndex
+
 		for reply.NextAttemptIdx > 0 && rf.log[reply.NextAttemptIdx].Term == term {
 			reply.NextAttemptIdx--
 		}
@@ -389,17 +386,15 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			rf.log = append(rf.log[:args.PrevLogIndex+1], args.Entries...)
 			rf.persist()
 		}
+		DPrintf("Server %d [Term %d] has log entries %v", rf.me, rf.currentTerm, rf.log)
+		// set commitIndex
+		if args.LeaderCommit > rf.commitIndex {
+			DPrintf("Server %d commiting as FOLLOWER", rf.me)
+			rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(len(rf.log)-1)))
+			go rf.sendToApplyCh()
+		}
+		reply.Success = true
 	}
-	DPrintf("Server %d [Term %d] has log entries %v", rf.me, rf.currentTerm, rf.log)
-	// set commitIndex
-	if args.LeaderCommit > rf.commitIndex {
-		DPrintf("+Server %d commiting as FOLLOWER", rf.me)
-		rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(len(rf.log)-1)))
-		go rf.sendToApplyCh()
-	}
-
-	reply.Success = true
-
 }
 
 func (rf *Raft) sendToApplyCh() {
@@ -593,11 +588,14 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.heartbeatRcvCh = make(chan bool, 100)
 	rf.voteGrantedCh = make(chan bool, 100)
 	rf.winElecCh = make(chan bool, 100)
+	// initialize from state persisted before a crash
+	rf.readPersist(rf.persister.ReadRaftState())
+	rf.log = make([]LogEntry, 0)
+	rf.log = append(rf.log, LogEntry{-1, 0})
+	rf.persist()
 	rf.nextIndex = make([]int, len(rf.peers))
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.totalVotes = 0
-	// initialize from state persisted before a crash
-	rf.readPersist(persister.ReadRaftState())
 	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	rf.mu.Lock()
 	DPrintf("Server %d started with state %s", rf.me, rf.serverState)
