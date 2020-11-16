@@ -19,11 +19,10 @@ package raft
 
 import (
 	"bytes"
-	"encoding/gob"
+	"log"
 	"math"
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"../labgob"
@@ -83,9 +82,7 @@ type Raft struct {
 	heartbeatRcvCh chan bool
 	voteGrantedCh  chan bool
 	winElecCh      chan bool
-	// Your data here (2A, 2B, 2C).
-	// Look at the paper's Figure 2 for a description of what
-	// state a Raft server must maintain.
+	killCh         chan bool
 }
 
 func (rf *Raft) saveFollowerState(term int, voteFor int) {
@@ -108,8 +105,10 @@ func (rf *Raft) saveLeaderState() {
 	rf.serverState = LEADER
 }
 
-func (rf *Raft) runAsFollower() {
-	DPrintf("Server %d running as follower", rf.me)
+func (rf *Raft) runAsFollower(pid int) {
+	rf.mu.Lock()
+	log.Printf("{pid %d}[Term %d] Server %d running as follower", pid, rf.currentTerm, rf.me)
+	rf.mu.Unlock()
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	select {
 	case <-rf.timer.C: // time elapsed, convert to candidate
@@ -125,89 +124,100 @@ func (rf *Raft) runAsFollower() {
 	}
 }
 
-func (rf *Raft) runAsCandidate() {
-	DPrintf("Server %d running as candidate", rf.me)
+func (rf *Raft) runAsCandidate(pid int) {
+	rf.mu.Lock()
+	log.Printf("{pid %d}[Term %d] Server %d running as candidate", pid, rf.currentTerm, rf.me)
+	rf.mu.Unlock()
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	// start election
-	go func() {
-		rf.mu.Lock()
-		// check if heartbeat is received and need to convert to follower before sending requestVote request
-		if rf.serverState != CANDIDATE {
-			rf.mu.Unlock()
-			return
-		}
-		lastTerm, lastIdx := rf.getLastLogTermAndIndex()
-		args := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}
-		DPrintf("[Term %d] Server %d sending requestVote", rf.currentTerm, rf.me)
-		rf.mu.Unlock()
-		for peerID := range rf.peers {
-			go func(peerID int) {
-				if peerID == rf.me {
-					return
-				}
-				reply := RequestVoteReply{}
-				ok := rf.sendRequestVote(peerID, &args, &reply)
-
-				if !ok {
-					DPrintf("Server %d Failed sending RequestVote to %d", rf.me, peerID)
-					return
-				}
-				rf.mu.Lock()
-				DPrintf("[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", rf.currentTerm, rf.me, peerID, reply.VoteGranted)
-				if reply.Term > rf.currentTerm {
-					rf.saveFollowerState(reply.Term, -1)
-					rf.mu.Unlock()
-					return
-				}
-				// in case of 2 requestVote go routines races and one of them got reply.Term > rf.currentTerm
-				// then rf.currentTerm will be updated and serverState will be FOLLOWER
-				if rf.currentTerm != args.Term || rf.serverState != CANDIDATE {
-					rf.mu.Unlock()
-					return
-				}
-				// check state in case it has already been converted to leader
-				if reply.VoteGranted {
-					rf.totalVotes++
-					if rf.totalVotes > len(rf.peers)/2 && rf.serverState == CANDIDATE {
-						rf.saveLeaderState()
-						rf.winElecCh <- true
-					}
-				}
+	for peerID := range rf.peers {
+		go func(peerID int, pid int) {
+			if peerID == rf.me {
+				return
+			}
+			rf.mu.Lock()
+			if rf.serverState != CANDIDATE {
 				rf.mu.Unlock()
-			}(peerID)
-		}
-	}()
+				return
+			}
+			lastTerm, lastIdx := rf.getLastLogTermAndIndex()
+			args := RequestVoteArgs{rf.currentTerm, rf.me, lastIdx, lastTerm}
+			reply := RequestVoteReply{}
+			rf.mu.Unlock()
+			ok := rf.sendRequestVote(peerID, &args, &reply)
+
+			if !ok {
+				DPrintf("Server %d Failed sending RequestVote to %d", rf.me, peerID)
+				return
+			}
+			rf.mu.Lock()
+			// check if state changed during RPC call
+			if rf.currentTerm != args.Term || rf.serverState != CANDIDATE {
+				rf.mu.Unlock()
+				return
+			}
+			// log.Printf("{pid %d}[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", pid, rf.currentTerm, rf.me, peerID, reply.VoteGranted)
+			if reply.Term > rf.currentTerm {
+				log.Printf("[Term %d] Server %d is stale as candidate, stepping down", rf.currentTerm, rf.me)
+				rf.saveFollowerState(reply.Term, -1)
+				rf.mu.Unlock()
+				return
+			}
+			if reply.VoteGranted {
+				rf.totalVotes++
+				if rf.totalVotes > len(rf.peers)/2 && rf.serverState == CANDIDATE {
+					log.Printf("[Term %d] Server %d got granted vote from %d, totalVotes = %d", rf.currentTerm, rf.me, peerID, rf.totalVotes)
+					rf.saveLeaderState()
+					rf.winElecCh <- true
+				}
+			}
+			rf.mu.Unlock()
+		}(peerID, pid)
+	}
 	select {
 	case <-rf.timer.C:
 		// in case of split vote, start a new term
+		// TODO: double check if we actually need this
 		rf.mu.Lock()
 		rf.saveCandidateState()
 		rf.mu.Unlock()
 		DPrintf("Server %d as Candidate time elapsed", rf.me)
 	case <-rf.winElecCh:
-		DPrintf("Server %d as Candidate won election, exiting", rf.me)
+		rf.mu.Lock()
+		_, lastIdx := rf.getLastLogTermAndIndex()
+		rf.matchIndex = make([]int, len(rf.peers))
+		rf.nextIndex = make([]int, len(rf.peers))
+		for i := range rf.peers {
+			rf.nextIndex[i] = lastIdx + 1
+		}
+		// log.Printf("Server %d as Candidate won election, will start from index %v, log len is %d , exiting", rf.me, rf.nextIndex, len(rf.log))
+		rf.mu.Unlock()
 	case <-rf.heartbeatRcvCh:
 		DPrintf("Server %d as Candidate received heartbeat", rf.me)
+		rf.mu.Lock()
+		rf.saveFollowerState(rf.currentTerm, -1)
+		rf.mu.Unlock()
 	}
 }
 
-func (rf *Raft) runAsLeader() {
-	DPrintf("Server %d running as leader", rf.me)
+func (rf *Raft) runAsLeader(pid int) {
 	rf.mu.Lock()
-	if rf.serverState != LEADER {
-		DPrintf("Server %d [Term %d] as a Leader already became a follower, exiting", rf.me, rf.currentTerm)
-		rf.mu.Unlock()
-		return
-	}
+	log.Printf("{pid %d}[Term %d] Server %d running as leader, %v", pid, rf.currentTerm, rf.me, &rf)
 	rf.mu.Unlock()
-	DPrintf("Server %d as Leader checked state, remains Leader", rf.me)
 	for peerID := range rf.peers {
-		go func(peerID int) {
+		go func(peerID int, pid int) {
 			if peerID == rf.me {
 				return
 			}
-			// populate arg fields for actual log update, currently only for heartbeat
+
 			rf.mu.Lock()
+			// Check if this leader is stale and has been converted to follower
+			// must check before sending heartbeat to each follower.
+			if rf.serverState != LEADER {
+				// log.Printf("{pid %d} Server %d [Term %d] as a Leader already became a follower, exiting", pid, rf.me, rf.currentTerm)
+				rf.mu.Unlock()
+				return
+			}
+			// populate arg fields for actual log update, currently only for heartbeat
 			_, lastIdx := rf.getLastLogTermAndIndex()
 			nextIdx := rf.nextIndex[peerID]
 			args, reply := AppendEntriesArgs{}, AppendEntriesReply{}
@@ -221,7 +231,7 @@ func (rf *Raft) runAsLeader() {
 				args.Entries = rf.log[rf.nextIndex[peerID]:]
 			}
 			args.LeaderCommit = rf.commitIndex
-			DPrintf("Server %d sending heartbeat to Server %d, sending %d entries", rf.me, peerID, len(args.Entries))
+			// log.Printf("{pid %d} Server %d sending heartbeat to Server %d, sending %d entries", pid, rf.me, peerID, len(args.Entries))
 			rf.mu.Unlock()
 			ok := rf.sendAppendEntries(peerID, &args, &reply)
 			if !ok {
@@ -230,14 +240,19 @@ func (rf *Raft) runAsLeader() {
 			}
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
-			DPrintf("Server %d got heartbeat reply from Server %d, reply.Term = %d, currentTerm = %d", rf.me, peerID, reply.Term, rf.currentTerm)
+			// log.Printf("{pid %d} Server %d got heartbeat reply from Server %d, reply.Term = %d, currentTerm = %d", pid, rf.me, peerID, reply.Term, rf.currentTerm)
+			// check if state changed during RPC call. See "term confusion" section of the raft student guide
+			// https://thesquareplanet.com/blog/students-guide-to-raft/
+			if rf.currentTerm != args.Term {
+				return
+			}
 			if reply.Term > rf.currentTerm {
 				DPrintf("Server %d as leader is stale, in %d", rf.me, peerID)
 				rf.saveFollowerState(reply.Term, -1)
 			}
 			if reply.Success {
-				rf.nextIndex[peerID] += len(args.Entries) // really?
-				rf.matchIndex[peerID] = rf.nextIndex[peerID] - 1
+				rf.matchIndex[peerID] = args.PrevLogIndex + len(args.Entries)
+				rf.nextIndex[peerID] = args.PrevLogIndex + len(args.Entries) + 1
 			} else {
 				rf.nextIndex[peerID] = reply.NextAttemptIdx
 			}
@@ -256,13 +271,12 @@ func (rf *Raft) runAsLeader() {
 				}
 				if count > len(rf.peers)/2 {
 					rf.commitIndex = N
-					DPrintf("Server %d commiting index %d as LEADER", rf.me, N)
 					go rf.sendToApplyCh()
 					break
 				}
 			}
-			DPrintf("Server %d returned from goroutine heartbeat to Server %d", rf.me, peerID)
-		}(peerID)
+			// log.Printf("{pid %d} Server %d returned from goroutine heartbeat to Server %d as a %s", pid, rf.me, peerID, rf.serverState)
+		}(peerID, pid)
 
 	}
 }
@@ -270,7 +284,6 @@ func (rf *Raft) runAsLeader() {
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
-	// Your code here (2A).
 	rf.mu.Lock()
 	DPrintf("Get State on Server %d, state = %s", rf.me, rf.serverState)
 	defer rf.mu.Unlock()
@@ -301,7 +314,7 @@ func (rf *Raft) readPersist(data []byte) {
 	}
 
 	r := bytes.NewBuffer(data)
-	d := gob.NewDecoder(r)
+	d := labgob.NewDecoder(r)
 	d.Decode(&rf.currentTerm)
 	d.Decode(&rf.votedFor)
 	d.Decode(&rf.log)
@@ -344,27 +357,27 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		reply.NextAttemptIdx = lastIdx + 1
 		return
 	}
-	rf.saveFollowerState(args.Term, args.LeaderID)
-	// log.Printf("===Before=== Term = %d, votedFor = %d", rf.currentTerm, rf.votedFor)
-	rf.heartbeatRcvCh <- true
-	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	// TODO: debug why these two lines can't be removed, since the logic is duplicated in saveFollowerState()
-	rf.votedFor = args.LeaderID
-	rf.currentTerm = args.Term
 	reply.Term = rf.currentTerm
+	if args.Term > rf.currentTerm {
+		// rf.saveFollowerState(args.Term, -1)
+		rf.serverState = FOLLOWER
+		rf.totalVotes = 0
+		rf.currentTerm = args.Term
+		rf.votedFor = -1
+		rf.persist()
+	}
+	rf.heartbeatRcvCh <- true
 
 	// reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
-
 	if lastIdx < args.PrevLogIndex {
 		reply.Term = rf.currentTerm
 		reply.Success = false
 		reply.NextAttemptIdx = lastIdx + 1
 		return
 	}
-
 	reply.NextAttemptIdx = args.PrevLogIndex
 	if args.PrevLogIndex > 0 && rf.log[args.PrevLogIndex].Term != args.PrevLogTerm {
-		term := rf.log[args.PrevLogTerm].Term
+		term := rf.log[args.PrevLogIndex].Term
 
 		for reply.NextAttemptIdx > 0 && rf.log[reply.NextAttemptIdx].Term == term {
 			reply.NextAttemptIdx--
@@ -389,7 +402,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		DPrintf("Server %d [Term %d] has log entries %v", rf.me, rf.currentTerm, rf.log)
 		// set commitIndex
 		if args.LeaderCommit > rf.commitIndex {
-			DPrintf("Server %d commiting as FOLLOWER", rf.me)
 			rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(len(rf.log)-1)))
 			go rf.sendToApplyCh()
 		}
@@ -438,7 +450,6 @@ type RequestVoteReply struct {
 // example RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-	// Your code here (2A, 2B).
 	rf.mu.Lock()
 	DPrintf("Server %d [Term = %d] received vote request from %d [Term = %d]", rf.me, rf.currentTerm, args.CandidateID, args.Term)
 	if args.Term < rf.currentTerm { // requestor is stale
@@ -457,25 +468,45 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	}
 
 	if args.Term > rf.currentTerm {
-		rf.saveFollowerState(args.Term, rf.votedFor)
+		rf.saveFollowerState(args.Term, -1)
 		DPrintf("Server %d is stale and received request vote, converting to follower", rf.me)
 	}
 
-	lastTerm, lastIdx := rf.getLastLogTermAndIndex()
+	// lastTerm, lastIdx := rf.getLastLogTermAndIndex()
 
-	if args.LastLogTerm < lastTerm || args.LastLogTerm == lastTerm && args.LastLogIndex < lastIdx {
-		reply.Term = rf.currentTerm
-		reply.VoteGranted = false
-	} else {
+	// if args.LastLogTerm < lastTerm || args.LastLogTerm == lastTerm && args.LastLogIndex < lastIdx {
+	// 	reply.Term = rf.currentTerm
+	// 	reply.VoteGranted = false
+	// } else {
+	// 	reply.Term = rf.currentTerm
+	// 	reply.VoteGranted = true
+	// 	rf.votedFor = args.CandidateID
+	// 	rf.voteGrantedCh <- true
+	// 	rf.persist()
+	// }
+	if rf.isUpToDate(args.LastLogIndex, args.LastLogTerm) {
 		reply.Term = rf.currentTerm
 		reply.VoteGranted = true
 		rf.votedFor = args.CandidateID
 		rf.voteGrantedCh <- true
 		rf.persist()
+	} else {
+		reply.Term = rf.currentTerm
+		reply.VoteGranted = false
 	}
 
 	DPrintf("[Term %d] Server %d voted for Server %d: %t", rf.currentTerm, rf.me, args.CandidateID, reply.VoteGranted)
 	rf.mu.Unlock()
+}
+
+func (rf *Raft) isUpToDate(argIdx int, argTerm int) bool {
+	lastTerm, lastIdx := rf.getLastLogTermAndIndex()
+	log.Printf("lastTerm %d, lastIdx %d, argTerm %d, argIdx %d", lastTerm, lastIdx, argTerm, argIdx)
+	if argTerm != lastTerm {
+		return argTerm > lastTerm
+	}
+
+	return argIdx >= lastIdx
 }
 
 //
@@ -553,17 +584,24 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 // should call killed() to check whether it should stop.
 //
 func (rf *Raft) Kill() {
-	atomic.StoreInt32(&rf.dead, 1)
-	// Your code here, if desired.
+	select {
+	case <-rf.killCh: //if already set, consume it then resent to avoid block
+	default:
+	}
+	rf.killCh <- true
+	// original implementation below
+	// atomic.StoreInt32(&rf.dead, 1)
 }
 
 func (rf *Raft) killed() bool {
-	z := atomic.LoadInt32(&rf.dead)
-	return z == 1
+	// original implementation below. NOt used
+	// z := atomic.LoadInt32(&rf.dead)
+	// return z == 1
+	return false
 }
 
 func genRandomTimeDuration() int {
-	return rand.Intn(300) + 200
+	return rand.Intn(200) + 300
 }
 
 //
@@ -588,37 +626,43 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.heartbeatRcvCh = make(chan bool, 100)
 	rf.voteGrantedCh = make(chan bool, 100)
 	rf.winElecCh = make(chan bool, 100)
-	// initialize from state persisted before a crash
-	rf.readPersist(rf.persister.ReadRaftState())
-	rf.log = make([]LogEntry, 0)
-	rf.log = append(rf.log, LogEntry{-1, 0})
-	rf.persist()
+	rf.killCh = make(chan bool, 1)
+	rf.mu.Lock()
+	rf.lastApplied = 0
 	rf.nextIndex = make([]int, len(rf.peers))
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.totalVotes = 0
-	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
-	rf.mu.Lock()
-	DPrintf("Server %d started with state %s", rf.me, rf.serverState)
-	if rf.serverState == "" {
-		rf.saveFollowerState(0, -1)
-	}
+	rf.log = make([]LogEntry, 0)
+	rf.log = append(rf.log, LogEntry{-1, 0})
+	rf.currentTerm = 0
+	rf.votedFor = -1
+	rf.serverState = FOLLOWER
+	// read perviously persisted state
+	rf.readPersist(rf.persister.ReadRaftState())
+	rf.persist()
 	rf.mu.Unlock()
-	go func() {
+	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
+	pid := rand.Int() % 1000
+	go func(pint int) {
 		for {
+			select {
+			case <-rf.killCh:
+				return
+			default:
+			}
 			rf.mu.Lock()
 			state := rf.serverState
 			rf.mu.Unlock()
 			switch {
 			case state == FOLLOWER:
-				rf.runAsFollower()
+				rf.runAsFollower(pid)
 			case state == CANDIDATE:
-				rf.runAsCandidate()
+				rf.runAsCandidate(pid)
 			case state == LEADER:
-				rf.runAsLeader()
-				time.Sleep(200 * time.Millisecond)
+				rf.runAsLeader(pid)
+				time.Sleep(120 * time.Millisecond)
 			}
 		}
-	}()
-
+	}(pid)
 	return rf
 }
