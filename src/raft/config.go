@@ -177,6 +177,7 @@ func (cfg *config) start1(i int) {
 				// ignore other types of ApplyMsg
 			} else {
 				v := m.Command
+				// // log.Printf("Server %d has log %v got applyMsg %v", i, cfg.logs[i], m)
 				cfg.mu.Lock()
 				for j := 0; j < len(cfg.logs); j++ {
 					if old, oldok := cfg.logs[j][m.CommandIndex]; oldok && old != v {
@@ -203,10 +204,14 @@ func (cfg *config) start1(i int) {
 				// keep reading after error so that Raft doesn't block
 				// holding locks...
 			}
+			// // log.Printf("server %d has log on client side: %v", i, cfg.logs[i])
 		}
 	}()
 
 	rf := Make(ends, i, cfg.saved[i], applyCh)
+	// rf.mu.Lock()
+	// // // log.Printf("Server %d has log after make %v ==> %v", i, cfg.logs, rf.log)
+	// rf.mu.Unlock()
 
 	cfg.mu.Lock()
 	cfg.rafts[i] = rf
@@ -341,7 +346,7 @@ func (cfg *config) checkTerms() int {
 	for i := 0; i < cfg.n; i++ {
 		if cfg.connected[i] {
 			xterm, _ := cfg.rafts[i].GetState()
-			log.Printf("Server %d has term %d", i, xterm)
+			// // // log.Printf("Server %d has term %d", i, xterm)
 			if term == -1 {
 				term = xterm
 			} else if term != xterm {
@@ -447,14 +452,16 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 			}
 			cfg.mu.Unlock()
 			if rf != nil {
+				// // // log.Printf("Starting %d %v", rf.me, cmd)
 				index1, _, ok := rf.Start(cmd)
+				// // // log.Printf("ok = %t", ok)
 				if ok {
 					index = index1
 					break
 				}
 			}
 		}
-
+		// // // log.Printf("=====index1 = %d", index)
 		if index != -1 {
 			// somebody claimed to be the leader and to have
 			// submitted our command; wait a while for agreement.

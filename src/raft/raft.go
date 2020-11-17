@@ -19,7 +19,6 @@ package raft
 
 import (
 	"bytes"
-	"log"
 	"math"
 	"math/rand"
 	"sync"
@@ -107,7 +106,7 @@ func (rf *Raft) saveLeaderState() {
 
 func (rf *Raft) runAsFollower(pid int) {
 	rf.mu.Lock()
-	log.Printf("{pid %d}[Term %d] Server %d running as follower", pid, rf.currentTerm, rf.me)
+	// log.Printf("{pid %d}[Term %d] Server %d running as follower", pid, rf.currentTerm, rf.me)
 	rf.mu.Unlock()
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	select {
@@ -126,7 +125,7 @@ func (rf *Raft) runAsFollower(pid int) {
 
 func (rf *Raft) runAsCandidate(pid int) {
 	rf.mu.Lock()
-	log.Printf("{pid %d}[Term %d] Server %d running as candidate", pid, rf.currentTerm, rf.me)
+	// log.Printf("{pid %d}[Term %d] Server %d running as candidate", pid, rf.currentTerm, rf.me)
 	rf.mu.Unlock()
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	for peerID := range rf.peers {
@@ -155,9 +154,9 @@ func (rf *Raft) runAsCandidate(pid int) {
 				rf.mu.Unlock()
 				return
 			}
-			// log.Printf("{pid %d}[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", pid, rf.currentTerm, rf.me, peerID, reply.VoteGranted)
+			// // log.Printf("{pid %d}[Term %d] Server %d sent requestVote to Server %d, voteGranted = %t", pid, rf.currentTerm, rf.me, peerID, reply.VoteGranted)
 			if reply.Term > rf.currentTerm {
-				log.Printf("[Term %d] Server %d is stale as candidate, stepping down", rf.currentTerm, rf.me)
+				// log.Printf("[Term %d] Server %d is stale as candidate, stepping down", rf.currentTerm, rf.me)
 				rf.saveFollowerState(reply.Term, -1)
 				rf.mu.Unlock()
 				return
@@ -165,7 +164,7 @@ func (rf *Raft) runAsCandidate(pid int) {
 			if reply.VoteGranted {
 				rf.totalVotes++
 				if rf.totalVotes > len(rf.peers)/2 && rf.serverState == CANDIDATE {
-					log.Printf("[Term %d] Server %d got granted vote from %d, totalVotes = %d", rf.currentTerm, rf.me, peerID, rf.totalVotes)
+					// log.Printf("[Term %d] Server %d got granted vote from %d, totalVotes = %d", rf.currentTerm, rf.me, peerID, rf.totalVotes)
 					rf.saveLeaderState()
 					rf.winElecCh <- true
 				}
@@ -189,7 +188,7 @@ func (rf *Raft) runAsCandidate(pid int) {
 		for i := range rf.peers {
 			rf.nextIndex[i] = lastIdx + 1
 		}
-		// log.Printf("Server %d as Candidate won election, will start from index %v, log len is %d , exiting", rf.me, rf.nextIndex, len(rf.log))
+		// // log.Printf("Server %d as Candidate won election, will start from index %v, log len is %d , exiting", rf.me, rf.nextIndex, len(rf.log))
 		rf.mu.Unlock()
 	case <-rf.heartbeatRcvCh:
 		DPrintf("Server %d as Candidate received heartbeat", rf.me)
@@ -201,7 +200,7 @@ func (rf *Raft) runAsCandidate(pid int) {
 
 func (rf *Raft) runAsLeader(pid int) {
 	rf.mu.Lock()
-	log.Printf("{pid %d}[Term %d] Server %d running as leader, %v", pid, rf.currentTerm, rf.me, &rf)
+	// log.Printf("{pid %d}[Term %d] Server %d running as leader, %v", pid, rf.currentTerm, rf.me, &rf)
 	rf.mu.Unlock()
 	for peerID := range rf.peers {
 		go func(peerID int, pid int) {
@@ -213,7 +212,7 @@ func (rf *Raft) runAsLeader(pid int) {
 			// Check if this leader is stale and has been converted to follower
 			// must check before sending heartbeat to each follower.
 			if rf.serverState != LEADER {
-				// log.Printf("{pid %d} Server %d [Term %d] as a Leader already became a follower, exiting", pid, rf.me, rf.currentTerm)
+				// // log.Printf("{pid %d} Server %d [Term %d] as a Leader already became a follower, exiting", pid, rf.me, rf.currentTerm)
 				rf.mu.Unlock()
 				return
 			}
@@ -231,7 +230,7 @@ func (rf *Raft) runAsLeader(pid int) {
 				args.Entries = rf.log[rf.nextIndex[peerID]:]
 			}
 			args.LeaderCommit = rf.commitIndex
-			// log.Printf("{pid %d} Server %d sending heartbeat to Server %d, sending %d entries", pid, rf.me, peerID, len(args.Entries))
+			// // log.Printf("{pid %d} Server %d sending heartbeat to Server %d, sending %d entries", pid, rf.me, peerID, len(args.Entries))
 			rf.mu.Unlock()
 			ok := rf.sendAppendEntries(peerID, &args, &reply)
 			if !ok {
@@ -240,7 +239,7 @@ func (rf *Raft) runAsLeader(pid int) {
 			}
 			rf.mu.Lock()
 			defer rf.mu.Unlock()
-			// log.Printf("{pid %d} Server %d got heartbeat reply from Server %d, reply.Term = %d, currentTerm = %d", pid, rf.me, peerID, reply.Term, rf.currentTerm)
+			// // log.Printf("{pid %d} Server %d got heartbeat reply from Server %d, reply.Term = %d, currentTerm = %d", pid, rf.me, peerID, reply.Term, rf.currentTerm)
 			// check if state changed during RPC call. See "term confusion" section of the raft student guide
 			// https://thesquareplanet.com/blog/students-guide-to-raft/
 			if rf.currentTerm != args.Term {
@@ -275,7 +274,7 @@ func (rf *Raft) runAsLeader(pid int) {
 					break
 				}
 			}
-			// log.Printf("{pid %d} Server %d returned from goroutine heartbeat to Server %d as a %s", pid, rf.me, peerID, rf.serverState)
+			// // log.Printf("{pid %d} Server %d returned from goroutine heartbeat to Server %d as a %s", pid, rf.me, peerID, rf.serverState)
 		}(peerID, pid)
 
 	}
@@ -501,7 +500,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 func (rf *Raft) isUpToDate(argIdx int, argTerm int) bool {
 	lastTerm, lastIdx := rf.getLastLogTermAndIndex()
-	log.Printf("lastTerm %d, lastIdx %d, argTerm %d, argIdx %d", lastTerm, lastIdx, argTerm, argIdx)
+	// log.Printf("lastTerm %d, lastIdx %d, argTerm %d, argIdx %d", lastTerm, lastIdx, argTerm, argIdx)
 	if argTerm != lastTerm {
 		return argTerm > lastTerm
 	}
