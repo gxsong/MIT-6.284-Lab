@@ -1,12 +1,14 @@
 package kvraft
 
 import (
-	"../labgob"
-	"../labrpc"
 	"log"
-	"../raft"
 	"sync"
 	"sync/atomic"
+	"time"
+
+	"../labgob"
+	"../labrpc"
+	"../raft"
 )
 
 const Debug = 0
@@ -18,13 +20,6 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
-
-type Op struct {
-	// Your definitions here.
-	// Field names must start with capital letters,
-	// otherwise RPC will break.
-}
-
 type KVServer struct {
 	mu      sync.Mutex
 	me      int
@@ -32,18 +27,124 @@ type KVServer struct {
 	applyCh chan raft.ApplyMsg
 	dead    int32 // set by Kill()
 
+	opChans map[int]chan interface{} // index to Op map
+	store   map[string]string
+
 	maxraftstate int // snapshot if log grows this big
 
-	// Your definitions here.
 }
 
+func (kv *KVServer) get(key string) string {
+	return ""
+}
+
+func (kv *KVServer) put(key string, value string) {
+
+}
+
+func (kv *KVServer) append(key string, value string) {
+
+}
+
+/**
+* Consider schenarios:
+* 1. Leader raft functions as usual, client send request:
+* 		raft commits the `op` at `index` returned by start(), `op` is sent back to `opChan` normally
+* 2. Leader raft disconnected from network, ops sent from clients won't be committed:
+* 		kv has an `opChan` at `index` but never hear back from `opChan`, timeout and return
+* 3. Leader reconnected as follower, a lot of logs from other rafts came in via applyCh:
+* 		those logs will be applied, but doesn't belong to any requests this server recieved
+* 		if there's an index overlap (uncommited log from #2 already existing), the committed op will be passed back to opChan and ignored
+ */
+func (kv *KVServer) handleRequest(op *Op) bool {
+	// 1. send op to raft
+	index, _, ok := kv.rf.Start(op)
+	if !ok {
+		return false
+	}
+	// wait for the op to get committed
+	kv.mu.Lock()
+	opChan, ok := kv.opChans[index]
+	if !ok {
+		opChan = make(chan interface{}, 1)
+		kv.opChans[index] = opChan
+	}
+	kv.mu.Unlock()
+	// 2. wait for raft to commit log and execute command
+	// 		- if the exact op is commited and applied, return values
+	//		- if the wrong op is committed, return error wrong leader
+	// 		- if never commited, after a timeout, return error wrong leader (raft is dead or stale)
+	select {
+	case appliedOp := <-opChan:
+		if op == appliedOp {
+			return true
+		} else {
+			return false
+		}
+	case <-time.After(1000 * time.Millisecond):
+		return true
+	}
+}
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
-	// Your code here.
+	op := Op{args.OpType, args.Key, ""}
+	ok := kv.handleRequest(&op)
+	if ok {
+		kv.mu.Lock()
+		value, present := kv.store[op.Key]
+		if !present {
+			reply.Err = ErrNoKey
+		} else {
+			reply.Value = value
+			reply.Err = OK
+		}
+		kv.mu.Unlock()
+	}
+
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	// Your code here.
+	op := Op{args.OpType, args.Key, args.Value}
+	ok := kv.handleRequest(&op)
+	if ok {
+		reply.Err = OK
+	} else {
+		reply.Err = ErrWrongLeader
+	}
+}
+
+func (kv *KVServer) apply(op Op) {
+	kv.mu.Lock()
+	defer kv.mu.Unlock()
+	if op.Type == PUT {
+		kv.store[op.Key] = op.Value
+	} else if op.Type == APPEND {
+		val, present := kv.store[op.Key]
+		if !present {
+			val = ""
+		}
+		kv.store[op.Key] = val + op.Value
+	}
+}
+
+// listening kv.applyCh for committed logs from raft
+// apply ops from commited log (NOTE that the op doesn't have to belong to any request received by this server. it could be from some previous leader)
+// let handler know that log has been applied
+func (kv *KVServer) applyCommitted() {
+	for {
+		cmd := <-kv.applyCh
+		// update kv state to let handler know which ops are applied
+		index, op := cmd.CommandIndex, cmd.Command
+		// execute op if it's putappend, let the handler execute get, because it's harder to put err no key back to hander
+		kv.apply(op.(Op))
+		kv.mu.Lock()
+		opChan, present := kv.opChans[index]
+		if present {
+			opChan <- op
+		}
+		// if not present it means no handlers waiting on that index
+		kv.mu.Unlock()
+	}
 }
 
 //
@@ -94,8 +195,11 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
+	kv.opChans = make(map[int]chan interface{})
+	kv.store = make(map[string]string)
 
-	// You may need initialization code here.
+	// kick off a long-running go routine
+	go kv.applyCommitted()
 
 	return kv
 }
