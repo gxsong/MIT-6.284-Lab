@@ -49,13 +49,13 @@ const (
 //
 type ApplyMsg struct {
 	CommandValid bool
-	Command      *interface{}
+	Command      interface{}
 	CommandIndex int
 }
 
 type LogEntry struct {
 	Term    int // maybe change to lastTerm which only stores the term of last log entry
-	Command *interface{}
+	Command interface{}
 }
 
 //
@@ -538,7 +538,7 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 // term. the third return value is true if this server believes it is
 // the leader.
 //
-func (rf *Raft) Start(command *interface{}) (int, int, bool) {
+func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	// DPrintf("[Term %d] Server %d received Command %v as %s", rf.currentTerm, rf.me, command, rf.serverState)
@@ -614,7 +614,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.matchIndex = make([]int, len(rf.peers))
 	rf.totalVotes = 0
 	rf.log = make([]LogEntry, 0)
-	rf.log = append(rf.log, LogEntry{-1, nil})
+	rf.log = append(rf.log, LogEntry{-1, 0})
 	rf.currentTerm = 0
 	rf.votedFor = -1
 	rf.serverState = FOLLOWER
