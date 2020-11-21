@@ -1,7 +1,6 @@
 package kvraft
 
 import (
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,7 +14,7 @@ const Debug = 0
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug > 0 {
-		log.Printf(format, a...)
+		DPrintf(format, a...)
 	}
 	return
 }
@@ -27,22 +26,12 @@ type KVServer struct {
 	applyCh chan raft.ApplyMsg
 	dead    int32 // set by Kill()
 
-	opChans map[int]chan interface{} // index to Op map
-	store   map[string]string
+	opChans    map[int]chan interface{} // index to Op map
+	store      map[string]string
+	clientReqs map[int64]int64 // stores the lates serial number of each client
 
+	persister    *raft.Persister
 	maxraftstate int // snapshot if log grows this big
-
-}
-
-func (kv *KVServer) get(key string) string {
-	return ""
-}
-
-func (kv *KVServer) put(key string, value string) {
-
-}
-
-func (kv *KVServer) append(key string, value string) {
 
 }
 
@@ -56,7 +45,7 @@ func (kv *KVServer) append(key string, value string) {
 * 		those logs will be applied, but doesn't belong to any requests this server recieved
 * 		if there's an index overlap (uncommited log from #2 already existing), the committed op will be passed back to opChan and ignored
  */
-func (kv *KVServer) handleRequest(op *Op) bool {
+func (kv *KVServer) handleRequest(op Op) bool {
 	// 1. send op to raft
 	index, _, ok := kv.rf.Start(op)
 	if !ok {
@@ -76,19 +65,22 @@ func (kv *KVServer) handleRequest(op *Op) bool {
 	// 		- if never commited, after a timeout, return error wrong leader (raft is dead or stale)
 	select {
 	case appliedOp := <-opChan:
+		DPrintf("[kv][Server] Server %d applied op %v, op sent:%v", kv.me, appliedOp, op)
 		if op == appliedOp {
 			return true
 		} else {
 			return false
 		}
 	case <-time.After(1000 * time.Millisecond):
-		return true
+		DPrintf("[kv][Server] Server %d Request timed out %v", kv.me, op)
+		return false
 	}
 }
 
 func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
-	op := Op{args.OpType, args.Key, ""}
-	ok := kv.handleRequest(&op)
+	DPrintf("[kv][Server] Server %d got Get Request", kv.me)
+	op := Op{args.ClientID, args.Serial, args.OpType, args.Key, ""}
+	ok := kv.handleRequest(op)
 	if ok {
 		kv.mu.Lock()
 		value, present := kv.store[op.Key]
@@ -99,13 +91,15 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 			reply.Err = OK
 		}
 		kv.mu.Unlock()
+	} else {
+		reply.Err = ErrWrongLeader
 	}
-
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	op := Op{args.OpType, args.Key, args.Value}
-	ok := kv.handleRequest(&op)
+	DPrintf("[kv][Server] Server %d got PutAppend Request", kv.me)
+	op := Op{args.ClientID, args.Serial, args.OpType, args.Key, args.Value}
+	ok := kv.handleRequest(op)
 	if ok {
 		reply.Err = OK
 	} else {
@@ -132,18 +126,30 @@ func (kv *KVServer) apply(op Op) {
 // let handler know that log has been applied
 func (kv *KVServer) applyCommitted() {
 	for {
+		DPrintf("[kv][Server] for loop..")
 		cmd := <-kv.applyCh
+		DPrintf("[kv][Server] Server %d got command %v", kv.me, cmd)
 		// update kv state to let handler know which ops are applied
-		index, op := cmd.CommandIndex, cmd.Command
+		index, op := cmd.CommandIndex, cmd.Command.(Op)
+		// Only execute op if it's serial number is the latest of the client's, for request deduplication
+		// Consider the scenario when the leader committed the op but crashed before replying to the client
+		// The client will got request timeout and resend the same request to a new leader. The same request will then be applied twice.
+
 		// execute op if it's putappend, let the handler execute get, because it's harder to put err no key back to hander
-		kv.apply(op.(Op))
+		if serial, present := kv.clientReqs[op.ClientID]; !present || op.Serial > serial {
+			kv.apply(op)
+			kv.clientReqs[op.ClientID] = op.Serial
+		}
 		kv.mu.Lock()
 		opChan, present := kv.opChans[index]
+		DPrintf("[kv][Server] Server %d sending op to opChan at index %d", kv.me, index)
 		if present {
 			opChan <- op
 		}
+		DPrintf("[kv][Server] Server %d end sending op to opChan at index %d", kv.me, index)
 		// if not present it means no handlers waiting on that index
 		kv.mu.Unlock()
+
 	}
 }
 
@@ -194,9 +200,11 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	// You may need initialization code here.
 
 	kv.applyCh = make(chan raft.ApplyMsg)
-	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
+	kv.persister = persister
+	kv.rf = raft.Make(servers, me, kv.persister, kv.applyCh)
 	kv.opChans = make(map[int]chan interface{})
 	kv.store = make(map[string]string)
+	kv.clientReqs = make(map[int64]int64)
 
 	// kick off a long-running go routine
 	go kv.applyCommitted()

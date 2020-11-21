@@ -1,13 +1,17 @@
 package kvraft
 
-import "../labrpc"
-import "crypto/rand"
-import "math/big"
+import (
+	"crypto/rand"
+	"math/big"
 
+	"../labrpc"
+)
 
 type Clerk struct {
-	servers []*labrpc.ClientEnd
-	// You will have to modify this struct.
+	servers  []*labrpc.ClientEnd
+	leaderID int
+	clientID int64
+	serial   int64
 }
 
 func nrand() int64 {
@@ -18,9 +22,12 @@ func nrand() int64 {
 }
 
 func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
+	DPrintf("making client")
 	ck := new(Clerk)
 	ck.servers = servers
-	// You'll have to add code here.
+	ck.leaderID = 0
+	ck.clientID = nrand()
+	ck.serial = 0
 	return ck
 }
 
@@ -37,9 +44,22 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 // arguments. and reply must be passed as a pointer.
 //
 func (ck *Clerk) Get(key string) string {
-
-	// You will have to modify this function.
-	return ""
+	ck.serial++
+	for {
+		args, reply := GetArgs{ck.clientID, ck.serial, key, GET}, GetReply{}
+		DPrintf("[kv][Client] Client making Get request to server %d", ck.leaderID)
+		ok := ck.servers[ck.leaderID].Call("KVServer.Get", &args, &reply)
+		DPrintf("[kv][Client] Client got reply %v", reply)
+		if !ok || reply.Err == ErrWrongLeader {
+			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
+			continue
+		}
+		if reply.Err == OK {
+			return reply.Value
+		} else if reply.Err == ErrNoKey {
+			return ""
+		}
+	}
 }
 
 //
@@ -52,13 +72,26 @@ func (ck *Clerk) Get(key string) string {
 // must match the declared types of the RPC handler function's
 // arguments. and reply must be passed as a pointer.
 //
-func (ck *Clerk) PutAppend(key string, value string, op string) {
-	// You will have to modify this function.
+func (ck *Clerk) PutAppend(key string, value string, op OpType) {
+	ck.serial++
+	for {
+		args, reply := PutAppendArgs{ck.clientID, ck.serial, key, value, op}, PutAppendReply{}
+		DPrintf("[kv][Client] Client making Get request to server %d", ck.leaderID)
+		ok := ck.servers[ck.leaderID].Call("KVServer.PutAppend", &args, &reply)
+		DPrintf("[kv][Client] Client got reply %v from server %d", reply, ck.leaderID)
+		if !ok || reply.Err == ErrWrongLeader {
+			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
+			continue
+		}
+		if reply.Err == OK {
+			return
+		}
+	}
 }
 
 func (ck *Clerk) Put(key string, value string) {
-	ck.PutAppend(key, value, "Put")
+	ck.PutAppend(key, value, PUT)
 }
 func (ck *Clerk) Append(key string, value string) {
-	ck.PutAppend(key, value, "Append")
+	ck.PutAppend(key, value, APPEND)
 }

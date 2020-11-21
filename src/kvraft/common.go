@@ -8,14 +8,29 @@ const (
 
 type Err string
 
+type OpType string
+
+const (
+	PUT    OpType = "PUT"
+	APPEND OpType = "APPEND"
+	GET    OpType = "GET"
+)
+
+type Op struct {
+	ClientID int64
+	Serial   int64
+	Type     OpType
+	Key      string
+	Value    string
+}
+
 // Put or Append
 type PutAppendArgs struct {
-	Key   string
-	Value string
-	Op    string // "Put" or "Append"
-	// You'll have to add definitions here.
-	// Field names must start with capital letters,
-	// otherwise RPC will break.
+	ClientID int64
+	Serial   int64
+	Key      string
+	Value    string
+	OpType   OpType
 }
 
 type PutAppendReply struct {
@@ -23,8 +38,11 @@ type PutAppendReply struct {
 }
 
 type GetArgs struct {
-	Key string
-	// You'll have to add definitions here.
+	// For request dupication. See raft extended paper section 8
+	ClientID int64
+	Serial   int64
+	Key      string
+	OpType   OpType
 }
 
 type GetReply struct {
