@@ -3,6 +3,7 @@ package kvraft
 import (
 	"crypto/rand"
 	"math/big"
+	"time"
 
 	"../labrpc"
 )
@@ -22,7 +23,7 @@ func nrand() int64 {
 }
 
 func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
-	DPrintf("making client")
+	// DPrintf("making client")
 	ck := new(Clerk)
 	ck.servers = servers
 	ck.leaderID = 0
@@ -49,16 +50,17 @@ func (ck *Clerk) Get(key string) string {
 		args, reply := GetArgs{ck.clientID, ck.serial, key, GET}, GetReply{}
 		DPrintf("[kv][Client] Client making Get request to server %d", ck.leaderID)
 		ok := ck.servers[ck.leaderID].Call("KVServer.Get", &args, &reply)
-		DPrintf("[kv][Client] Client got reply %v", reply)
 		if !ok || reply.Err == ErrWrongLeader {
 			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
 			continue
 		}
+		DPrintf("[kv][Client] Client got reply %v", reply)
 		if reply.Err == OK {
 			return reply.Value
 		} else if reply.Err == ErrNoKey {
 			return ""
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -78,14 +80,15 @@ func (ck *Clerk) PutAppend(key string, value string, op OpType) {
 		args, reply := PutAppendArgs{ck.clientID, ck.serial, key, value, op}, PutAppendReply{}
 		DPrintf("[kv][Client] Client making Get request to server %d", ck.leaderID)
 		ok := ck.servers[ck.leaderID].Call("KVServer.PutAppend", &args, &reply)
-		DPrintf("[kv][Client] Client got reply %v from server %d", reply, ck.leaderID)
 		if !ok || reply.Err == ErrWrongLeader {
 			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
 			continue
 		}
+		DPrintf("[kv][Client] Client got reply %v from server %d", reply, ck.leaderID)
 		if reply.Err == OK {
 			return
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 

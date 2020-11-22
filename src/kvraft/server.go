@@ -1,8 +1,8 @@
 package kvraft
 
 import (
+	"bytes"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"../labgob"
@@ -32,7 +32,7 @@ type KVServer struct {
 
 	persister    *raft.Persister
 	maxraftstate int // snapshot if log grows this big
-
+	killCh       chan bool
 }
 
 /**
@@ -46,12 +46,15 @@ type KVServer struct {
 * 		if there's an index overlap (uncommited log from #2 already existing), the committed op will be passed back to opChan and ignored
  */
 func (kv *KVServer) handleRequest(op Op) bool {
+	DPrintf("Server %d Handle request", kv.me)
 	// 1. send op to raft
 	index, _, ok := kv.rf.Start(op)
 	if !ok {
 		return false
 	}
 	// wait for the op to get committed
+	// TODO: locking issue?
+	DPrintf("Server %d Handle request before locking", kv.me)
 	kv.mu.Lock()
 	opChan, ok := kv.opChans[index]
 	if !ok {
@@ -59,6 +62,7 @@ func (kv *KVServer) handleRequest(op Op) bool {
 		kv.opChans[index] = opChan
 	}
 	kv.mu.Unlock()
+	DPrintf("Server %d before Select", kv.me)
 	// 2. wait for raft to commit log and execute command
 	// 		- if the exact op is commited and applied, return values
 	//		- if the wrong op is committed, return error wrong leader
@@ -97,7 +101,7 @@ func (kv *KVServer) Get(args *GetArgs, reply *GetReply) {
 }
 
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
-	DPrintf("[kv][Server] Server %d got PutAppend Request", kv.me)
+	DPrintf("[kv][Server] Server %d got PutAppend Request {%s %s}", kv.me, args.Key, args.Value)
 	op := Op{args.ClientID, args.Serial, args.OpType, args.Key, args.Value}
 	ok := kv.handleRequest(op)
 	if ok {
@@ -108,8 +112,6 @@ func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 }
 
 func (kv *KVServer) apply(op Op) {
-	kv.mu.Lock()
-	defer kv.mu.Unlock()
 	if op.Type == PUT {
 		kv.store[op.Key] = op.Value
 	} else if op.Type == APPEND {
@@ -126,9 +128,24 @@ func (kv *KVServer) apply(op Op) {
 // let handler know that log has been applied
 func (kv *KVServer) applyCommitted() {
 	for {
-		DPrintf("[kv][Server] for loop..")
+		select {
+		case <-kv.killCh:
+			// DPrintf("Server %d killed", kv.me)
+			return
+		default:
+			// DPrintf("Server %d still alive", kv.me)
+		}
 		cmd := <-kv.applyCh
+
+		// apply snapshot
+		if cmd.IsSnapshot {
+			DPrintf("[kv][Server] Server %d got snapshot", kv.me)
+			kv.applySnapshot(cmd.Command.([]byte))
+			continue
+		}
+
 		DPrintf("[kv][Server] Server %d got command %v", kv.me, cmd)
+
 		// update kv state to let handler know which ops are applied
 		index, op := cmd.CommandIndex, cmd.Command.(Op)
 		// Only execute op if it's serial number is the latest of the client's, for request deduplication
@@ -136,18 +153,23 @@ func (kv *KVServer) applyCommitted() {
 		// The client will got request timeout and resend the same request to a new leader. The same request will then be applied twice.
 
 		// execute op if it's putappend, let the handler execute get, because it's harder to put err no key back to hander
+		kv.mu.Lock()
 		if serial, present := kv.clientReqs[op.ClientID]; !present || op.Serial > serial {
 			kv.apply(op)
 			kv.clientReqs[op.ClientID] = op.Serial
 		}
-		kv.mu.Lock()
+
 		opChan, present := kv.opChans[index]
-		DPrintf("[kv][Server] Server %d sending op to opChan at index %d", kv.me, index)
+
 		if present {
+			DPrintf("[kv][Server] Server %d sending op to opChan at index %d", kv.me, index)
 			opChan <- op
+			DPrintf("[kv][Server] Server %d end sending op to opChan at index %d", kv.me, index)
 		}
-		DPrintf("[kv][Server] Server %d end sending op to opChan at index %d", kv.me, index)
+
 		// if not present it means no handlers waiting on that index
+
+		kv.checkSizeAndPersistSnapshot(index)
 		kv.mu.Unlock()
 
 	}
@@ -164,14 +186,68 @@ func (kv *KVServer) applyCommitted() {
 // to suppress debug output from a Kill()ed instance.
 //
 func (kv *KVServer) Kill() {
-	atomic.StoreInt32(&kv.dead, 1)
+	// atomic.StoreInt32(&kv.dead, 1)
+	// DPrintf("Kill() at Server %d", kv.me)
 	kv.rf.Kill()
-	// Your code here, if desired.
+	select {
+	case <-kv.killCh: //if already set, consume it then resent to avoid block
+		// return
+	default:
+	}
+	// DPrintf("before killCh at Server %d", kv.me)
+	kv.killCh <- true
+	// DPrintf("killing server %d", kv.me)
 }
 
 func (kv *KVServer) killed() bool {
-	z := atomic.LoadInt32(&kv.dead)
-	return z == 1
+	// z := atomic.LoadInt32(&kv.dead)
+	return false
+}
+
+func (kv *KVServer) encodeSnapshot() []byte {
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(kv.clientReqs)
+	e.Encode(kv.store)
+	return w.Bytes()
+}
+
+func (kv *KVServer) decodeSnapshot(data []byte) {
+	if data == nil || len(data) < 1 {
+		return
+	}
+
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+	d.Decode(&kv.clientReqs)
+	d.Decode(&kv.store)
+}
+
+// Check if raft state size is larger than maxraftstate
+// if so, send a snapshot to the raft
+
+// kv staste to save in snapshot:
+// kv.store, kv.clientReqs
+func (kv *KVServer) checkSizeAndPersistSnapshot(index int) {
+	if kv.maxraftstate == -1 {
+		return
+	}
+	if kv.persister.RaftStateSize()/10 >= kv.maxraftstate/10 { // take snapshot when appraoching limit
+		snapshot := kv.encodeSnapshot()
+		DPrintf("[kv][Server] server %d applying snapshot %v at index %d", kv.me, snapshot, index)
+		// must spawn another goroutine, otherwise server will be blocked waiting on raft's lock
+		go kv.rf.CompactLogAndSaveSnapshot(snapshot, index)
+	}
+}
+
+// apply snapshot to kv's state
+func (kv *KVServer) applySnapshot(snapshot []byte) {
+	// snapshot := kv.persister.ReadSnapshot()
+	DPrintf("[kv][Server] Serve %d applying Snapshot %v", kv.me, snapshot)
+	kv.mu.Lock()
+	kv.decodeSnapshot(snapshot)
+	kv.mu.Unlock()
+	DPrintf("[kv][Server] Serve %d done applying Snapshot", kv.me)
 }
 
 //
@@ -205,8 +281,11 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.opChans = make(map[int]chan interface{})
 	kv.store = make(map[string]string)
 	kv.clientReqs = make(map[int64]int64)
+	kv.killCh = make(chan bool, 1)
 
-	// kick off a long-running go routine
+	snapshot := kv.persister.ReadSnapshot()
+	kv.applySnapshot(snapshot)
+
 	go kv.applyCommitted()
 
 	return kv
