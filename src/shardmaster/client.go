@@ -4,13 +4,16 @@ package shardmaster
 // Shardmaster clerk.
 //
 
-import "../labrpc"
-import "time"
-import "crypto/rand"
-import "math/big"
+import (
+	"crypto/rand"
+	"math/big"
+	"time"
+
+	"../labrpc"
+)
 
 type Clerk struct {
-	servers []*labrpc.ClientEnd
+	servers  []*labrpc.ClientEnd
 	leaderID int
 	clientID int64
 	serial   int64
@@ -36,13 +39,15 @@ func (ck *Clerk) Query(num int) Config {
 	ck.serial++
 	for {
 		// try each known server.
-		args, reply := JoinArgs{ck.clientID, ck.serial, num}, JoinReply{}
+		args, reply := QueryArgs{ck.clientID, ck.serial, num}, QueryReply{}
 		ok := ck.servers[ck.leaderID].Call("ShardMaster.Query", &args, &reply)
 		if !ok || reply.Err == ErrWrongLeader {
 			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
 			continue
 		}
-		// TODO: process reply
+		if reply.Err == OK {
+			return reply.Config
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -57,7 +62,9 @@ func (ck *Clerk) Join(servers map[int][]string) {
 			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
 			continue
 		}
-		// TODO: process reply
+		if reply.Err == OK {
+			return
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -72,7 +79,9 @@ func (ck *Clerk) Leave(gids []int) {
 			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
 			continue
 		}
-		// TODO: process reply
+		if reply.Err == OK {
+			return
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 }
@@ -87,7 +96,9 @@ func (ck *Clerk) Move(shard int, gid int) {
 			ck.leaderID = (ck.leaderID + 1) % len(ck.servers)
 			continue
 		}
-		// TODO: process reply
+		if reply.Err == OK {
+			return
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
 }

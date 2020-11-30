@@ -29,7 +29,7 @@ type Config struct {
 }
 
 const (
-	OK = "OK"
+	OK             = "OK"
 	ErrWrongLeader = "ErrWrongLeader"
 )
 
@@ -39,55 +39,60 @@ type OpType string
 
 const (
 	APPEND OpType = "APPEND" // for new configs made in join(), leave(), and move()
-	GET    OpType = "GET" // for query()
+	GET    OpType = "GET"    // for query()
 )
 
 type Op struct {
-	ClientID int64
-	Serial   int64
-	Type     OpType
-	ConfigNum      int	// key: config number
+	ClientID  int64
+	Serial    int64
+	Type      OpType
+	ConfigNum int    // key: config number
 	Config    Config // value: config
+}
+
+func (op *Op) equal(other interface{}) bool {
+	otherOp := other.(Op)
+	return op.ClientID == otherOp.ClientID && op.Serial == otherOp.Serial
 }
 
 type JoinArgs struct {
 	ClientID int64
 	Serial   int64
-	Servers map[int][]string // new GID -> servers mappings
+	Servers  map[int][]string // new GID -> servers mappings
 }
 
 type JoinReply struct {
-	Err         Err
+	Err Err
 }
 
 type LeaveArgs struct {
 	ClientID int64
 	Serial   int64
-	GIDs []int
+	GIDs     []int
 }
 
 type LeaveReply struct {
-	Err         Err
+	Err Err
 }
 
 type MoveArgs struct {
 	ClientID int64
 	Serial   int64
-	Shard int
-	GID   int
+	Shard    int
+	GID      int
 }
 
 type MoveReply struct {
-	Err         Err
+	Err Err
 }
 
 type QueryArgs struct {
 	ClientID int64
 	Serial   int64
-	Num int // desired config number
+	Num      int // desired config number
 }
 
 type QueryReply struct {
-	Err         Err
-	Config      Config
+	Err    Err
+	Config Config
 }

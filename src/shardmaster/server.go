@@ -1,6 +1,7 @@
 package shardmaster
 
 import (
+	"math"
 	"sync"
 	"time"
 
@@ -46,7 +47,8 @@ func (sm *ShardMaster) handleRequest(op Op) bool {
 	// 		- if never commited, after a timeout, return error wrong leader (raft is dead or stale)
 	select {
 	case appliedOp := <-opChan:
-		if op == appliedOp {
+		// TODO: add equal() function for this
+		if op.equal(appliedOp) {
 			return true
 		} else {
 			return false
@@ -56,33 +58,110 @@ func (sm *ShardMaster) handleRequest(op Op) bool {
 	}
 }
 
+// given newly added gid --> servers mapping, return a new mapping
+// containing that and the existing mapping
+func (sm *ShardMaster) addNewGroups(incomingGroups map[int][]string) map[int][]string {
+	currGroups := sm.config[len(sm.config)-1].Groups
+	newGroups := make(map[int][]string)
+	for gid, servers := range currGroups {
+		newGroups[gid] = servers
+	}
+	for gid, servers := range incomingGroups {
+		newGroups[gid] = servers
+	}
+	return newGroups
+}
+
+// given gids to remove, return a new mapping
+// containing the existing mapping except gids to remove
+func (sm *ShardMaster) removeGroups(gids []int) map[int][]string {
+	currGroups := sm.config[len(sm.config)-1].Groups
+	newGroups := make(map[int][]string)
+	for gid, servers := range currGroups {
+		newGroups[gid] = servers
+	}
+	for _, gid := range gids {
+		delete(newGroups, gid)
+	}
+	return newGroups
+}
+
+// given a group mapping, return an array indexed by shard numbers with balanced group assignment
+func (sm *ShardMaster) rebalanceShards(groups map[int][]string) [NShards]int {
+	currAssign := make(map[int][]int)
+	for gid, _ := range groups {
+		currAssign[gid] = []int{}
+	}
+	for shard, gid := range sm.config[len(sm.config)-1].Shards {
+		currAssign[gid] = append(currAssign[gid], shard)
+	}
+	nGroups := len(groups)
+
+	maxLoad := int(math.Ceil(NShards / float64(nGroups)))
+	for gid, _ := range currAssign {
+		for len(currAssign[gid]) > maxLoad {
+			// move one shard to one of the underloaded groups
+			for gidNew, _ := range currAssign {
+				if len(currAssign[gidNew]) < maxLoad {
+					currAssign[gidNew] = append(currAssign[gidNew], currAssign[gid][0])
+					currAssign[gid] = currAssign[gid][1:]
+					break
+				}
+			}
+		}
+	}
+	newShardArr := [NShards]int{}
+	for gid, shards := range currAssign {
+		for _, shard := range shards {
+			newShardArr[shard] = gid
+		}
+	}
+	return newShardArr
+}
+
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
-	// TODO: build op.Value, set configNum
-	configNum := 0
-	config := Config{}
+	configNum := len(sm.config)
+	newGroups := sm.addNewGroups(args.Servers)
+	rebalancedShards := sm.rebalanceShards(newGroups)
+	config := Config{configNum, rebalancedShards, newGroups}
 	op := Op{args.ClientID, args.Serial, APPEND, configNum, config}
 	ok := sm.handleRequest(op)
+	if ok {
+		reply.Err = OK
+	} else {
+		reply.Err = ErrWrongLeader
+	}
 }
 
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) {
-	// TODO: build op.Value, set configNum
-	configNum := 0
-	config := Config{}
+	configNum := len(sm.config)
+	newGroups := sm.removeGroups(args.GIDs)
+	rebalancedShards := sm.rebalanceShards(newGroups)
+	config := Config{configNum, rebalancedShards, newGroups}
 	op := Op{args.ClientID, args.Serial, APPEND, configNum, config}
 	ok := sm.handleRequest(op)
+	if ok {
+		reply.Err = OK
+	} else {
+		reply.Err = ErrWrongLeader
+	}
 }
 
 func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) {
-	// TODO: build op.Value, set configNum
-	configNum := 0
-	config := Config{}
+	configNum := len(sm.config)
+	config := Config{configNum, sm.config[len(sm.config)-1].Shards, sm.config[len(sm.config)-1].Groups}
+	config.Shards[args.Shard] = args.GID
 	op := Op{args.ClientID, args.Serial, APPEND, configNum, config}
 	ok := sm.handleRequest(op)
+	if ok {
+		reply.Err = OK
+	} else {
+		reply.Err = ErrWrongLeader
+	}
 }
 
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
-	// TODO: build op.Value, set configNum
-	configNum := 0
+	configNum := args.Num
 	config := Config{}
 	op := Op{args.ClientID, args.Serial, GET, configNum, config}
 	ok := sm.handleRequest(op)
@@ -102,7 +181,7 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
 
 func (sm *ShardMaster) apply(op Op) {
 	if op.Type == APPEND {
-		append(sm.config, op.Config)
+		sm.config = append(sm.config, op.Config)
 	}
 }
 
@@ -182,8 +261,8 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister)
 	sm := new(ShardMaster)
 	sm.me = me
 
-	sm.configs = make([]Config, 1)
-	sm.configs[0].Groups = map[int][]string{}
+	sm.config = make([]Config, 1)
+	sm.config[0].Groups = map[int][]string{}
 
 	labgob.Register(Op{})
 	sm.applyCh = make(chan raft.ApplyMsg)
