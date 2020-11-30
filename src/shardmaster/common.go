@@ -30,44 +30,64 @@ type Config struct {
 
 const (
 	OK = "OK"
+	ErrWrongLeader = "ErrWrongLeader"
 )
 
 type Err string
 
+type OpType string
+
+const (
+	APPEND OpType = "APPEND" // for new configs made in join(), leave(), and move()
+	GET    OpType = "GET" // for query()
+)
+
+type Op struct {
+	ClientID int64
+	Serial   int64
+	Type     OpType
+	ConfigNum      int	// key: config number
+	Config    Config // value: config
+}
+
 type JoinArgs struct {
+	ClientID int64
+	Serial   int64
 	Servers map[int][]string // new GID -> servers mappings
 }
 
 type JoinReply struct {
-	WrongLeader bool
 	Err         Err
 }
 
 type LeaveArgs struct {
+	ClientID int64
+	Serial   int64
 	GIDs []int
 }
 
 type LeaveReply struct {
-	WrongLeader bool
 	Err         Err
 }
 
 type MoveArgs struct {
+	ClientID int64
+	Serial   int64
 	Shard int
 	GID   int
 }
 
 type MoveReply struct {
-	WrongLeader bool
 	Err         Err
 }
 
 type QueryArgs struct {
+	ClientID int64
+	Serial   int64
 	Num int // desired config number
 }
 
 type QueryReply struct {
-	WrongLeader bool
 	Err         Err
 	Config      Config
 }
