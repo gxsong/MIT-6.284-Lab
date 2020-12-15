@@ -1,6 +1,7 @@
 package shardmaster
 
 import (
+	"log"
 	"math"
 	"sync"
 	"time"
@@ -115,7 +116,6 @@ func (sm *ShardMaster) rebalanceShards(groups map[int][]string) [NShards]int {
 	newAssign := sm.getShardAssign(sm.config[len(sm.config)-1].Shards, groups)
 	maxLoad := int(math.Ceil(NShards / float64(nGroups)))
 	minLoad := int(math.Floor(NShards / float64(nGroups)))
-	// log.Printf("pre assign = %v", newAssign)
 	for gid := range newAssign {
 		for len(newAssign[gid]) > maxLoad || (gid == 0 && len(newAssign[gid]) > 0) {
 			// move one shard to one of the underloaded groups
@@ -148,7 +148,6 @@ func (sm *ShardMaster) rebalanceShards(groups map[int][]string) [NShards]int {
 			delete(newAssign, 0)
 		}
 	}
-	// log.Printf("after assign = %v", newAssign)
 	newShardArr := [NShards]int{}
 	for gid, shards := range newAssign {
 		for _, shard := range shards {
@@ -159,13 +158,7 @@ func (sm *ShardMaster) rebalanceShards(groups map[int][]string) [NShards]int {
 }
 
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
-	// log.Printf("Join(%v)", args)
-	// sm.mu.Lock()
-	// configNum := len(sm.config)
-	// newGroups := sm.addNewGroups(args.Servers)
-	// newShards := sm.rebalanceShards(newGroups)
-	// sm.mu.Unlock()
-	// config := Config{configNum, newShards, newGroups}
+	log.Printf("Shard master got join request %v", args)
 	op := Op{args.ClientID, args.Serial, JOIN, map[int][]string{}, []int{}, -1, -1, -1}
 	op.JoinServers = args.Servers
 	ok := sm.handleRequest(op)
@@ -177,13 +170,7 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
 }
 
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) {
-	// // log.Printf("Leave(%v)", args)
-	// sm.mu.Lock()
-	// configNum := len(sm.config)
-	// newGroups := sm.removeGroups(args.GIDs)
-	// newShards := sm.rebalanceShards(newGroups)
-	// sm.mu.Unlock()
-	// config := Config{configNum, newShards, newGroups}
+	log.Printf("Shard master got leave request %v", args)
 	op := Op{args.ClientID, args.Serial, LEAVE, map[int][]string{}, []int{}, -1, -1, -1}
 	op.LeaveGIDs = args.GIDs
 	ok := sm.handleRequest(op)
@@ -195,13 +182,6 @@ func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) {
 }
 
 func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) {
-	// sm.mu.Lock()
-	// configNum := len(sm.config)
-	// groups := sm.config[len(sm.config)-1].Groups
-	// shards := sm.config[len(sm.config)-1].Shards
-	// sm.mu.Unlock()
-	// shards[args.Shard] = args.GID
-	// config := Config{configNum, shards, groups}
 	op := Op{args.ClientID, args.Serial, MOVE, map[int][]string{}, []int{}, -1, -1, -1}
 	op.MoveShard = args.Shard
 	op.MoveGID = args.GID
@@ -214,7 +194,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) {
 }
 
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
-	// // log.Printf("Got Query request %v", args)
+	log.Printf("Shard master got query request %v", args)
 	op := Op{args.ClientID, args.Serial, QUERY, map[int][]string{}, []int{}, -1, -1, -1}
 	op.QueryConfigNum = args.Num
 	ok := sm.handleRequest(op)
@@ -234,6 +214,7 @@ func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
 }
 
 func (sm *ShardMaster) apply(op Op) {
+
 	if op.Type == QUERY {
 		return
 	}
@@ -256,8 +237,7 @@ func (sm *ShardMaster) apply(op Op) {
 	}
 	config.Num, config.Shards, config.Groups = configNum, newShards, newGroups
 	sm.config = append(sm.config, config)
-	// log.Printf("config = %v", sm.config)
-
+	log.Printf("Shard Master got new config, op %v, config %v", op.Type, config)
 }
 
 // listening sm.applyCh for committed logs from raft

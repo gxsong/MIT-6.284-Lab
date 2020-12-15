@@ -89,19 +89,23 @@ func TestBasic(t *testing.T) {
 
 	cfa := make([]Config, 6)
 	cfa[0] = ck.Query(-1)
-	log.Printf("Quuery(-1)")
+	log.Printf("[1] Query()")
 	check(t, []int{}, ck)
-	log.Printf("check")
+	log.Printf("check [1] %v", cfa[0])
 
 	var gid1 int = 1
 	ck.Join(map[int][]string{gid1: []string{"x", "y", "z"}})
+	log.Printf("[2] Join()")
 	check(t, []int{gid1}, ck)
 	cfa[1] = ck.Query(-1)
+	log.Printf("check [2] %v", cfa[1])
 
 	var gid2 int = 2
 	ck.Join(map[int][]string{gid2: []string{"a", "b", "c"}})
+	log.Printf("[3] Join()")
 	check(t, []int{gid1, gid2}, ck)
 	cfa[2] = ck.Query(-1)
+	log.Printf("check [3] %v", cfa[2])
 
 	cfx := ck.Query(-1)
 	sa1 := cfx.Groups[gid1]
@@ -114,8 +118,10 @@ func TestBasic(t *testing.T) {
 	}
 
 	ck.Leave([]int{gid1})
+	log.Printf("[4] Leave()")
 	check(t, []int{gid2}, ck)
 	cfa[4] = ck.Query(-1)
+	log.Printf("check [4] %v", cfa[4])
 
 	ck.Leave([]int{gid2})
 	cfa[5] = ck.Query(-1)

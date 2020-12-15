@@ -1,15 +1,19 @@
 package shardkv
 
-import "../porcupine"
-import "../models"
-import "testing"
-import "strconv"
-import "time"
-import "fmt"
-import "sync/atomic"
-import "sync"
-import "math/rand"
-import "io/ioutil"
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"math/rand"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"../models"
+	"../porcupine"
+)
 
 const linearizabilityCheckTimeout = 1 * time.Second
 
@@ -33,6 +37,7 @@ func TestStaticShards(t *testing.T) {
 
 	cfg.join(0)
 	cfg.join(1)
+	log.Printf("[test]Joined 0 and 1")
 
 	n := 10
 	ka := make([]string, n)
@@ -51,7 +56,7 @@ func TestStaticShards(t *testing.T) {
 	// Get()s don't succeed.
 	cfg.ShutdownGroup(1)
 	cfg.checklogs() // forbid snapshots
-
+	log.Printf("[test]Shut down group 1")
 	ch := make(chan bool)
 	for xi := 0; xi < n; xi++ {
 		ck1 := cfg.makeClient() // only one call allowed per client
@@ -60,7 +65,7 @@ func TestStaticShards(t *testing.T) {
 			check(t, ck1, ka[i], va[i])
 		}(xi)
 	}
-
+	log.Printf("[test]Sending Get()s..")
 	// wait a bit, only about half the Gets should succeed.
 	ndone := 0
 	done := false
@@ -77,9 +82,10 @@ func TestStaticShards(t *testing.T) {
 	if ndone != 5 {
 		t.Fatalf("expected 5 completions with one shard dead; got %v\n", ndone)
 	}
-
+	log.Printf("[test]Done sending gets")
 	// bring the crashed shard/group back to life.
 	cfg.StartGroup(1)
+	log.Printf("[test]Restarting group 1")
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
 	}

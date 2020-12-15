@@ -38,16 +38,25 @@ type Err string
 type OpType string
 
 const (
-	APPEND OpType = "APPEND" // for new configs made in join(), leave(), and move()
-	GET    OpType = "GET"    // for query()
+	JOIN  OpType = "JOIN"
+	LEAVE OpType = "LEAVE"
+	MOVE  OpType = "MOVE"
+	QUERY OpType = "QUERY"
 )
 
 type Op struct {
-	ClientID  int64
-	Serial    int64
-	Type      OpType
-	ConfigNum int    // key: config number
-	Config    Config // value: config
+	ClientID int64
+	Serial   int64
+	Type     OpType
+	// join args
+	JoinServers map[int][]string
+	// leave args
+	LeaveGIDs []int
+	// move args
+	MoveShard int
+	MoveGID   int
+	// query args
+	QueryConfigNum int
 }
 
 func (op *Op) equal(other interface{}) bool {
