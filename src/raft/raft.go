@@ -321,6 +321,12 @@ func (rf *Raft) runAsLeader(pid int) {
 	}
 }
 
+func (rf *Raft) IsLeader() bool {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.serverState == LEADER
+}
+
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {

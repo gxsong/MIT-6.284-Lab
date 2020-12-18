@@ -10,6 +10,7 @@ package shardkv
 
 import (
 	"crypto/rand"
+	"log"
 	"math/big"
 	"time"
 
@@ -77,7 +78,7 @@ func (ck *Clerk) Get(key string) string {
 
 	for {
 		gid := ck.config.Shards[shard]
-		if servers, ok := ck.config.Groups[gid]; ok {
+		if servers, present := ck.config.Groups[gid]; present {
 			// try each server for the shard.
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
@@ -96,8 +97,6 @@ func (ck *Clerk) Get(key string) string {
 		// ask master for the latest configuration.
 		ck.config = ck.sm.Query(-1)
 	}
-
-	return ""
 }
 
 //
@@ -111,11 +110,12 @@ func (ck *Clerk) PutAppend(key string, value string, op OpType) {
 
 	for {
 		gid := ck.config.Shards[shard]
-		if servers, ok := ck.config.Groups[gid]; ok {
+		if servers, present := ck.config.Groups[gid]; present {
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
 				var reply PutAppendReply
 				ok := srv.Call("ShardKV.PutAppend", &args, &reply)
+				log.Printf("%s, %d, %d, Request got err %s", servers[si], ck.clientID, ck.serial, reply.Err)
 				if ok && reply.Err == OK {
 					return
 				}

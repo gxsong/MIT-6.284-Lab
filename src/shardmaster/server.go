@@ -1,7 +1,6 @@
 package shardmaster
 
 import (
-	"log"
 	"math"
 	"sync"
 	"time"
@@ -158,7 +157,7 @@ func (sm *ShardMaster) rebalanceShards(groups map[int][]string) [NShards]int {
 }
 
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
-	log.Printf("Shard master got join request %v", args)
+	// log.Printf("Shard master got join request %v", args)
 	op := Op{args.ClientID, args.Serial, JOIN, map[int][]string{}, []int{}, -1, -1, -1}
 	op.JoinServers = args.Servers
 	ok := sm.handleRequest(op)
@@ -170,7 +169,7 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
 }
 
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) {
-	log.Printf("Shard master got leave request %v", args)
+	// log.Printf("Shard master got leave request %v", args)
 	op := Op{args.ClientID, args.Serial, LEAVE, map[int][]string{}, []int{}, -1, -1, -1}
 	op.LeaveGIDs = args.GIDs
 	ok := sm.handleRequest(op)
@@ -194,7 +193,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) {
 }
 
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
-	log.Printf("Shard master got query request %v", args)
+	// log.Printf("Shard master got query request %v", args)
 	op := Op{args.ClientID, args.Serial, QUERY, map[int][]string{}, []int{}, -1, -1, -1}
 	op.QueryConfigNum = args.Num
 	ok := sm.handleRequest(op)
@@ -237,7 +236,7 @@ func (sm *ShardMaster) apply(op Op) {
 	}
 	config.Num, config.Shards, config.Groups = configNum, newShards, newGroups
 	sm.config = append(sm.config, config)
-	log.Printf("Shard Master got new config, op %v, config %v", op.Type, config)
+	// log.Printf("Shard Master got new config, op %v, config %v", op.Type, config)
 }
 
 // listening sm.applyCh for committed logs from raft

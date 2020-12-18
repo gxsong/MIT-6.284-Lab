@@ -14,10 +14,12 @@ import (
 //
 
 const (
-	OK             = "OK"
-	ErrNoKey       = "ErrNoKey"
-	ErrWrongGroup  = "ErrWrongGroup"
-	ErrWrongLeader = "ErrWrongLeader"
+	OK                = "OK"
+	ErrNoKey          = "ErrNoKey"
+	ErrWrongGroup     = "ErrWrongGroup"
+	ErrWrongLeader    = "ErrWrongLeader"
+	ErrDupRequest     = "ErrDupRequest"
+	ErrUpdatingConfig = "ErrUpdatingConfig"
 )
 
 type Err string
@@ -45,7 +47,7 @@ type Op struct {
 	ConfigNum int
 	Config    shardmaster.Config
 	// SendShard Op fields:
-	destGID        int
+	DestGID        int
 	MovingShardNum int
 	// ReceiveShard Op fields:
 	MovingShardDB         DB
@@ -87,6 +89,7 @@ type GetReply struct {
 
 type MoveShardArgs struct {
 	FromGID         int
+	ToGID           int
 	ConfigNum       int
 	ShardNum        int
 	ShardDB         DB
@@ -99,3 +102,4 @@ type MoveShardReply struct {
 
 type DB map[string]string
 type ClientReqLog map[int64]int64
+type GroupReqLog map[int]map[int]bool
