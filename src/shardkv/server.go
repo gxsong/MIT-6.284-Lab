@@ -43,9 +43,9 @@ func (kv *ShardKV) commitOpToAllServers(op Op) Err {
 	// 1. send op to raft
 
 	index, _, ok := kv.rf.Start(op.copy())
-	kv.mu.Lock()
-	kv.isLeader = ok
-	kv.mu.Unlock()
+	// kv.mu.Lock()
+	// kv.isLeader = ok
+	// kv.mu.Unlock()
 	if !ok {
 		// log.Printf("Server %d-%d can't apply op, not leader", kv.me, kv.gid)
 		return ErrWrongLeader
@@ -267,16 +267,16 @@ func (kv *ShardKV) applyCommitted() {
 		default:
 			// DPrintf("Server %d still alive", kv.me)
 		}
-		// var  cmd raft.ApplyMsg
-		// select {
-		// case cmd = <-kv.applyCh:
-		// 	break
-		// default:
-		// 	time.Sleep(time.Millisecond * 100)
-		// 	continue
-		// }
+		var cmd raft.ApplyMsg
+		select {
+		case cmd = <-kv.applyCh:
+			break
+		default:
+			time.Sleep(time.Millisecond * 100)
+			continue
+		}
 		// log.Printf("===VVV=== %d", 540)
-		cmd := <-kv.applyCh
+		// cmd := <-kv.applyCh
 		// log.Printf("===ZZZ=== %d", 540)
 		// log.Printf("Server %d-%d got command at index %d from applyCh", kv.me, kv.gid, cmd.CommandIndex)
 
@@ -314,8 +314,6 @@ func (kv *ShardKV) applyCommitted() {
 		kv.mu.Unlock()
 		kv.checkSizeAndPersistSnapshot(index)
 		// log.Printf("Server %d-%d released lock in applyCommitted", kv.me, kv.gid)
-		time.Sleep(time.Millisecond * 100)
-
 	}
 }
 
@@ -361,22 +359,21 @@ func (kv *ShardKV) decodeSnapshot(data []byte) {
 // kv staste to save in snapshot:
 // kv.store, kv.clientReqs
 func (kv *ShardKV) checkSizeAndPersistSnapshot(index int) {
-	kv.mu.Lock()
 	if kv.maxraftstate == -1 {
-		kv.mu.Unlock()
 		return
 	}
 	takeSnapshot := false
 	snapshot := []byte{}
 	if kv.persister.RaftStateSize()/10 >= kv.maxraftstate/10 { // take snapshot when appraoching limit
 		// log.Printf("Server %d-%d state size is %d", kv.me, kv.gid, kv.persister.RaftStateSize())
+		kv.mu.Lock()
 		snapshot = kv.encodeSnapshot()
+		kv.mu.Unlock()
 		takeSnapshot = true
 		// DPrintf("[kv][Server] server %d applying snapshot %v at index %d", kv.me, snapshot, index)
 		// must spawn another goroutine, otherwise server will be blocked waiting on raft's lock
 
 	}
-	kv.mu.Unlock()
 	if takeSnapshot {
 		go kv.rf.CompactLogAndSaveSnapshot(snapshot, index)
 	}
@@ -470,9 +467,7 @@ func copyConfig(config shardmaster.Config) shardmaster.Config {
 
 func (kv *ShardKV) syncConfig() {
 	for {
-		// if !kv.rf.IsLeader() {
-		// 	continue
-		// }
+
 		select {
 		case <-kv.killCh:
 			// DPrintf("Server %d killed", kv.me)
@@ -480,12 +475,9 @@ func (kv *ShardKV) syncConfig() {
 		default:
 			// DPrintf("Server %d still alive", kv.me)
 		}
-		kv.mu.Lock()
-		if !kv.isLeader {
-			kv.mu.Unlock()
+		if _, isLeader := kv.rf.GetState(); !isLeader {
 			continue
 		}
-		kv.mu.Unlock()
 
 		newestConfig := kv.sm.Query(-1)
 		kv.mu.Lock()
@@ -581,28 +573,17 @@ func (kv *ShardKV) sendMoveShardToGroupLeader(servers []string, args *MoveShardA
 }
 
 func (kv *ShardKV) MoveShard(args *MoveShardArgs, reply *MoveShardReply) {
-
-	// if !kv.rf.IsLeader() {
-	// 	reply.Err = ErrWrongLeader
-	// 	kv.mu.Unlock()
-	// 	return
-	// }
-
-	// if !kv.rf.IsLeader() {
-	// 	// log.Printf("Server %d-%d got MoveShard request but wrong leader %v", kv.me, kv.gid, args)
-	// 	reply.Err = ErrWrongLeader
-	// 	return
-	// }
+	if _, isLeader := kv.rf.GetState(); !isLeader {
+		reply.Err = ErrWrongLeader
+		return
+	}
 
 	kv.mu.Lock()
 	if kv.currConfigNum > args.ConfigNum {
 		kv.mu.Unlock()
 		return
 	}
-	if !kv.isLeader {
-		kv.mu.Unlock()
-		return
-	}
+
 	if args.ToGID != kv.gid {
 		reply.Err = ErrWrongGroup
 		// log.Printf("Server %d-%d got MoveShard request  but wront group %v", kv.me, kv.gid, args)
@@ -635,17 +616,17 @@ func (kv *ShardKV) MoveShard(args *MoveShardArgs, reply *MoveShardReply) {
 
 }
 
-func (kv *ShardKV) checkLeader() {
-	for {
-		select {
-		case isLeader := <-kv.rf.LeaderCh:
-			// // log.Printf("Server %d-%d received %t from leaderCh", kv.me, kv.gid, isLeader)
-			kv.mu.Lock()
-			kv.isLeader = isLeader
-			kv.mu.Unlock()
-		}
-	}
-}
+// func (kv *ShardKV) checkLeader() {
+// 	for {
+// 		select {
+// 		case isLeader := <-kv.rf.LeaderCh:
+// 			// // log.Printf("Server %d-%d received %t from leaderCh", kv.me, kv.gid, isLeader)
+// 			kv.mu.Lock()
+// 			kv.isLeader = isLeader
+// 			kv.mu.Unlock()
+// 		}
+// 	}
+// }
 
 //
 // servers[] contains the ports of the servers in this group.
@@ -693,7 +674,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.persister = persister
-	kv.rf = raft.Make(servers, me, gid, kv.persister, kv.applyCh)
+	kv.rf = raft.Make(servers, me, kv.persister, kv.applyCh)
 	kv.opChans = make(map[int]chan interface{})
 	kv.shardedDB = make(map[int]DB)
 	kv.clientReqs = make(map[int]ClientReqLog)
@@ -711,7 +692,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister,
 
 	go kv.applyCommitted()
 	go kv.syncConfig()
-	go kv.checkLeader()
+	// go kv.checkLeader()
 
 	return kv
 }

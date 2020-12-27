@@ -18,18 +18,18 @@ import (
 const linearizabilityCheckTimeout = 1 * time.Second
 
 func check(t *testing.T, ck *Clerk, key string, value string) {
-	log.Printf("Getting %s -> %s", key, value)
+	// log.Printf("Getting %s -> %s", key, value)
 	v := ck.Get(key)
 	if v != value {
 		t.Fatalf("Get(%v): expected:\n%v\nreceived:\n%v", key, value, v)
 	}
-	log.Printf("Successfully got %s -> %s", key, value)
+	// log.Printf("Successfully got %s -> %s", key, value)
 }
 
 //
 // test static 2-way sharding, without shard movement.
 //
-func TestStaticShards(t *testing.T) {
+func TestStaticShardsX(t *testing.T) {
 	fmt.Printf("Test: static shards ...\n")
 
 	cfg := make_config(t, 3, false, -1)
@@ -95,7 +95,7 @@ func TestStaticShards(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
-func TestJoinLeave(t *testing.T) {
+func TestJoinLeaveX(t *testing.T) {
 	fmt.Printf("Test: join then leave ...\n")
 
 	cfg := make_config(t, 3, false, -1)
@@ -152,7 +152,7 @@ func TestJoinLeave(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
-func TestSnapshot(t *testing.T) {
+func TestSnapshotX(t *testing.T) {
 	fmt.Printf("Test: snapshots, join, and leave ...\n")
 
 	cfg := make_config(t, 3, false, 1000)
@@ -220,7 +220,7 @@ func TestSnapshot(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
-func TestMissChange(t *testing.T) {
+func TestMissChangeX(t *testing.T) {
 	fmt.Printf("Test: servers miss configuration changes...\n")
 
 	cfg := make_config(t, 3, false, 1000)
@@ -306,7 +306,7 @@ func TestMissChange(t *testing.T) {
 	fmt.Printf("  ... Passed\n")
 }
 
-func TestConcurrent1(t *testing.T) {
+func TestConcurrent1X(t *testing.T) {
 	fmt.Printf("Test: concurrent puts and configuration changes...\n")
 
 	cfg := make_config(t, 3, false, 100)

@@ -19,7 +19,6 @@ package raft
 
 import (
 	"bytes"
-	// "log"
 	"math"
 	"math/rand"
 	"sync"
@@ -68,8 +67,7 @@ type Raft struct {
 	peers             []*labrpc.ClientEnd // RPC end points of all peers
 	persister         *Persister          // Object to hold this peer's persisted state
 	me                int                 // this peer's index into peers[]
-	gid               int
-	dead              int32 // set by Kill()
+	dead              int32               // set by Kill()
 	serverState       ServerState
 	currentTerm       int
 	votedFor          int
@@ -85,7 +83,6 @@ type Raft struct {
 	voteGrantedCh     chan bool
 	winElecCh         chan bool
 	killCh            chan bool
-	LeaderCh          chan bool // chan to notify server about state change
 	lastSnapshotIndex int
 	lastSnapshotTerm  int
 }
@@ -111,7 +108,9 @@ func (rf *Raft) saveLeaderState() {
 }
 
 func (rf *Raft) runAsFollower(pid int) {
-	// // DPrintf("{pid %d}[Term %d] Server %d running as follower", pid, rf.currentTerm, rf.me)
+	rf.mu.Lock()
+	// DPrintf("{pid %d}[Term %d] Server %d running as follower", pid, rf.currentTerm, rf.me)
+	rf.mu.Unlock()
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	select {
 	case <-rf.timer.C: // time elapsed, convert to candidate
@@ -128,6 +127,9 @@ func (rf *Raft) runAsFollower(pid int) {
 }
 
 func (rf *Raft) runAsCandidate(pid int) {
+	rf.mu.Lock()
+	// DPrintf("{pid %d}[Term %d] Server %d running as candidate", pid, rf.currentTerm, rf.me)
+	rf.mu.Unlock()
 	rf.timer.Reset(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	for peerID := range rf.peers {
 		go func(peerID int, pid int) {
@@ -200,6 +202,9 @@ func (rf *Raft) runAsCandidate(pid int) {
 }
 
 func (rf *Raft) runAsLeader(pid int) {
+	// rf.mu.Lock()
+	// DPrintf("{pid %d}[Term %d] Server %d running as leader, %v", pid, rf.currentTerm, rf.me, &rf)
+	// rf.mu.Unlock()
 	for peerID := range rf.peers {
 		go func(peerID int, pid int) {
 			if peerID == rf.me {
@@ -260,10 +265,7 @@ func (rf *Raft) runAsLeader(pid int) {
 					args.PrevLogTerm = rf.getLog(args.PrevLogIndex).Term
 				}
 				if nextIdx <= lastIdx {
-					args.Entries = []LogEntry{}
-					for _, log := range rf.log[rf.getActualIdx(rf.nextIndex[peerID]):] {
-						args.Entries = append(args.Entries, log)
-					}
+					args.Entries = rf.log[rf.getActualIdx(rf.nextIndex[peerID]):]
 				}
 				args.LeaderCommit = rf.commitIndex
 				// // DPrintf("{pid %d} Server %d sending heartbeat to Server %d, sending %d entries", pid, rf.me, peerID, len(args.Entries))
@@ -293,8 +295,7 @@ func (rf *Raft) runAsLeader(pid int) {
 				} else {
 					rf.nextIndex[peerID] = reply.NextAttemptIdx
 				}
-				// DPrintf("[Term %d] Server %d as %s done sending entries, reply = %v, matchIndex = %v, nextIndex = %v, commit index = %d", rf.currentTerm, rf.me, rf.serverState, reply, rf.matchIndex, rf.nextIndex, rf.commitIndex)
-				sendLogs := false
+				DPrintf("[Term %d] Server %d as %s done sending entries, reply = %v, matchIndex = %v, nextIndex = %v, commit index = %d", rf.currentTerm, rf.me, rf.serverState, reply, rf.matchIndex, rf.nextIndex, rf.commitIndex)
 				for N := rf.commitIndex + 1; N <= lastIdx; N++ {
 					if N < 0 {
 						continue
@@ -309,15 +310,9 @@ func (rf *Raft) runAsLeader(pid int) {
 					}
 					if count > len(rf.peers)/2 {
 						rf.commitIndex = N
-						sendLogs = true
+						go rf.sendToApplyCh()
 						break
 					}
-				}
-				// log.Printf("===CCC=== %d", 278)
-				if sendLogs {
-					// log.Printf("===DDD=== %d", 278)
-					rf.sendToApplyCh()
-					// log.Printf("===EEE=== %d", 278)
 				}
 			}
 			DPrintf("Server %d returned from goroutine heartbeat to Server %d as a %s", rf.me, peerID, rf.serverState)
@@ -343,30 +338,17 @@ func (rf *Raft) GetState() (int, bool) {
 
 func (rf *Raft) CompactLogAndSaveSnapshot(snapshot []byte, lastSnapshotIndex int) {
 	rf.mu.Lock()
-	// log.Printf("Server %d saving snapshot %v ending with index %d, curr log len %d", rf.me, snapshot, lastSnapshotIndex, rf.getLogicalIdx(len(rf.log)-1))
+	defer rf.mu.Unlock()
+	DPrintf("Server %d saving snapshot %v ending with index %d", rf.me, snapshot, lastSnapshotIndex)
 	if lastSnapshotIndex < rf.lastSnapshotIndex {
 		return
 	}
 	rf.log = rf.log[rf.getActualIdx(lastSnapshotIndex):]
 	rf.lastSnapshotIndex = lastSnapshotIndex
 	rf.lastSnapshotTerm = rf.getLog(rf.lastSnapshotIndex).Term
-
-	// raftState := rf.persister.ReadRaftState()
-	// w := new(bytes.Buffer)
-	// e := labgob.NewEncoder(w)
-	// e.Encode(rf.currentTerm)
-	// e.Encode(rf.votedFor)
-	// e.Encode(rf.log)
-	// // e.Encode(rf.lastSnapshotIndex)
-	// // e.Encode(rf.lastSnapshotTerm)
-	// data := w.Bytes()
-	// log.Printf("===AAA=== %d", 342)
-	rf.persist()
 	raftState := rf.persister.ReadRaftState()
 	rf.persister.SaveStateAndSnapshot(raftState, snapshot)
-	// log.Printf("===BBB=== %d", 342)
-	rf.mu.Unlock()
-	// // log.Printf("[raft]Server %d-%d done saving ending with index %d, log is %v", rf.me, rf.gid, lastSnapshotIndex, rf.log)
+	DPrintf("Server %d done saving snapshot %v ending with index %d", rf.me, snapshot, lastSnapshotIndex)
 }
 
 //
@@ -380,8 +362,6 @@ func (rf *Raft) persist() {
 	e.Encode(rf.currentTerm)
 	e.Encode(rf.votedFor)
 	e.Encode(rf.log)
-	// e.Encode(rf.lastSnapshotIndex)
-	// e.Encode(rf.lastSnapshotTerm)
 	data := w.Bytes()
 	rf.persister.SaveRaftState(data)
 }
@@ -399,8 +379,6 @@ func (rf *Raft) readPersist(data []byte) {
 	d.Decode(&rf.currentTerm)
 	d.Decode(&rf.votedFor)
 	d.Decode(&rf.log)
-	// d.Decode(&rf.lastSnapshotIndex)
-	// d.Decode(&rf.lastSnapshotTerm)
 }
 
 func (rf *Raft) getLogicalIdx(idx int) int {
@@ -510,37 +488,22 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		// set commitIndex
 		if args.LeaderCommit > rf.commitIndex {
 			rf.commitIndex = int(math.Min(float64(args.LeaderCommit), float64(rf.getLogicalIdx(len(rf.log)-1))))
-			rf.sendToApplyCh()
+			go rf.sendToApplyCh()
 		}
 		reply.Success = true
 	}
 }
 
 func (rf *Raft) sendToApplyCh() {
-	// log.Printf("===FFF=== %d", 278)
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	DPrintf("Server %d sending %v to applyCh lastApplied = %d commitIndex = %d", rf.me, rf.log[rf.getActualIdx(rf.lastApplied+1):rf.getActualIdx(rf.commitIndex+1)], rf.lastApplied, rf.commitIndex)
 	// DPrintf("Server %d [Term %d] has log entries %v", rf.me, rf.currentTerm, rf.log)
-	if rf.gid != -1 && rf.lastApplied+1 < rf.commitIndex {
-		// log.Printf("[raft]Server %d-%d sending %d-%d to applyCh", rf.me, rf.gid, rf.lastApplied+1, rf.commitIndex)
-	}
 	for i := rf.lastApplied + 1; i <= rf.commitIndex; i++ {
-		if rf.gid != -1 && rf.lastApplied+1 < rf.commitIndex {
-			// log.Printf("[raft]Server %d-%d sending %d to applyCh", rf.me, rf.gid, i)
-		}
-		if rf.gid != -1 {
-			// log.Printf("===XXX=== %d", 540)
-		}
 		rf.applyCh <- ApplyMsg{true, rf.getLog(i).Command, i, false}
-		if rf.gid != -1 {
-			// log.Printf("===YYY=== %d", 540)
-		}
-
-	}
-	if rf.gid != -1 && rf.lastApplied+1 < rf.commitIndex {
-		// log.Printf("[raft]Server %d-%d done sending %d-%d to applyCh", rf.me, rf.gid, rf.lastApplied+1, rf.commitIndex)
 	}
 	rf.lastApplied = rf.commitIndex
-	// log.Printf("===GGG=== %d", 278)
+	DPrintf("Server %d done sending to applyCh", rf.me)
 }
 
 func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
@@ -669,7 +632,7 @@ type InstallSnapshotReply struct {
 
 func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) {
 	rf.mu.Lock()
-	// log.Printf("[raft][install snapshot handler]Server %d-%d args.LastSnapshotIndex: %d", rf.me, rf.gid, args.LastSnapshotIndex)
+	DPrintf("[Term %d] Server %d received snapshot from leader %d term %d", rf.currentTerm, rf.me, args.LeaderID, args.Term)
 	defer rf.mu.Unlock()
 	reply.Term = rf.currentTerm
 	if args.Term < rf.currentTerm {
@@ -709,10 +672,8 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	rf.persister.SaveStateAndSnapshot(raftState, args.Snapshot)
 
 	// force the follower's log catch up with leader
-	// log.Printf("[raft][install snapshot handler]Server %d-%d lastApplied prev: %d", rf.me, rf.gid, rf.lastApplied)
 	rf.commitIndex = int(math.Max(float64(rf.commitIndex), float64(args.LastSnapshotIndex)))
 	rf.lastApplied = int(math.Max(float64(rf.lastApplied), float64(args.LastSnapshotIndex)))
-	// log.Printf("[raft][install snapshot handler]Server %d-%d lastApplied after: %d", rf.me, rf.gid, rf.lastApplied)
 
 	// tell kv server to apply snapshot to its storage
 	DPrintf("[Term %d] Server %d sending snapshot to applych", rf.currentTerm, rf.me)
@@ -799,20 +760,18 @@ func genRandomTimeDuration() int {
 // Make() must return quickly, so it should start goroutines
 // for any long-running work.
 //
-func Make(peers []*labrpc.ClientEnd, me int, gid int,
+func Make(peers []*labrpc.ClientEnd, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
 	rf := &Raft{}
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
-	rf.gid = gid
 	rf.applyCh = applyCh
 	DPrintf("Make Server %d", rf.me)
 	rf.heartbeatRcvCh = make(chan bool, 100)
 	rf.voteGrantedCh = make(chan bool, 100)
 	rf.winElecCh = make(chan bool, 100)
 	rf.killCh = make(chan bool, 1)
-	rf.LeaderCh = make(chan bool, 1)
 	rf.mu.Lock()
 	rf.lastApplied = 0
 	rf.nextIndex = make([]int, len(rf.peers))
@@ -830,8 +789,6 @@ func Make(peers []*labrpc.ClientEnd, me int, gid int,
 	rf.timer = time.NewTimer(time.Duration(genRandomTimeDuration()) * time.Millisecond)
 	pid := rand.Int() % 1000
 	go func(pint int) {
-		var prevState ServerState
-		var state ServerState
 		for {
 			select {
 			case <-rf.killCh:
@@ -840,20 +797,9 @@ func Make(peers []*labrpc.ClientEnd, me int, gid int,
 			default:
 				// DPrintf("Raft %d still alive", rf.me)
 			}
-
 			rf.mu.Lock()
-			state = rf.serverState
+			state := rf.serverState
 			rf.mu.Unlock()
-			if gid != -1 { // only do this for shardKV
-				if prevState != LEADER && state == LEADER {
-					// // log.Printf("[raft]Server %d-%d sending to leaderCh %t", rf.me, rf.gid, true)
-					rf.LeaderCh <- true
-				} else if prevState == LEADER && state != LEADER {
-					// // log.Printf("[raft]Server %d-%d sending to leaderCh %t", rf.me, rf.gid, false)
-					rf.LeaderCh <- false
-				}
-			}
-			prevState = state
 			switch {
 			case state == FOLLOWER:
 				rf.runAsFollower(pid)

@@ -208,7 +208,7 @@ func (cfg *config) start1(i int) {
 		}
 	}()
 
-	rf := Make(ends, i, -1, cfg.saved[i], applyCh)
+	rf := Make(ends, i, cfg.saved[i], applyCh)
 	// rf.mu.Lock()
 	// // // log.Printf("Server %d has log after make %v ==> %v", i, cfg.logs, rf.log)
 	// rf.mu.Unlock()

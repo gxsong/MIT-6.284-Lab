@@ -135,7 +135,15 @@ func (kv *KVServer) applyCommitted() {
 		default:
 			// DPrintf("Server %d still alive", kv.me)
 		}
-		cmd := <-kv.applyCh
+		var cmd raft.ApplyMsg
+		select {
+		case cmd = <-kv.applyCh:
+			break
+		default:
+			time.Sleep(time.Millisecond * 100)
+			continue
+		}
+		// cmd := <-kv.applyCh
 
 		// apply snapshot
 		if cmd.IsSnapshot {
@@ -157,10 +165,13 @@ func (kv *KVServer) applyCommitted() {
 		if serial, present := kv.clientReqs[op.ClientID]; !present || op.Serial > serial {
 			kv.apply(op)
 			kv.clientReqs[op.ClientID] = op.Serial
+		} else {
+			kv.mu.Unlock()
+			continue
 		}
 
 		opChan, present := kv.opChans[index]
-
+		kv.mu.Unlock()
 		if present {
 			DPrintf("[kv][Server] Server %d sending op to opChan at index %d", kv.me, index)
 			opChan <- op
@@ -168,7 +179,7 @@ func (kv *KVServer) applyCommitted() {
 		}
 
 		// if not present it means no handlers waiting on that index
-
+		kv.mu.Lock()
 		kv.checkSizeAndPersistSnapshot(index)
 		kv.mu.Unlock()
 

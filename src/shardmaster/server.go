@@ -1,6 +1,7 @@
 package shardmaster
 
 import (
+	// "log"
 	"math"
 	"sync"
 	"time"
@@ -40,6 +41,7 @@ func (sm *ShardMaster) handleRequest(op Op) bool {
 		sm.opChans[index] = opChan
 	}
 	sm.mu.Unlock()
+	// log.Printf("[sm] waiting for op at index %d ", index)
 	// 2. wait for raft to commit log and execute command
 	// 		- if the exact op is commited and applied, return values
 	//		- if the wrong op is committed, return error wrong leader
@@ -47,11 +49,14 @@ func (sm *ShardMaster) handleRequest(op Op) bool {
 	select {
 	case appliedOp := <-opChan:
 		if op.equal(appliedOp) {
+			// log.Printf("[sm] got op at index %d ", index)
 			return true
 		} else {
+			// log.Printf("[sm] got different op at index %d ", index)
 			return false
 		}
 	case <-time.After(1000 * time.Millisecond):
+		// log.Printf("[sm] timedout waiting for op at index %d ", index)
 		return false
 	}
 }
@@ -157,7 +162,7 @@ func (sm *ShardMaster) rebalanceShards(groups map[int][]string) [NShards]int {
 }
 
 func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
-	// log.Printf("Shard master got join request %v", args)
+	// // log.Printf("Shard master got join request %v", args)
 	op := Op{args.ClientID, args.Serial, JOIN, map[int][]string{}, []int{}, -1, -1, -1}
 	op.JoinServers = args.Servers
 	ok := sm.handleRequest(op)
@@ -169,7 +174,7 @@ func (sm *ShardMaster) Join(args *JoinArgs, reply *JoinReply) {
 }
 
 func (sm *ShardMaster) Leave(args *LeaveArgs, reply *LeaveReply) {
-	// log.Printf("Shard master got leave request %v", args)
+	// // log.Printf("Shard master got leave request %v", args)
 	op := Op{args.ClientID, args.Serial, LEAVE, map[int][]string{}, []int{}, -1, -1, -1}
 	op.LeaveGIDs = args.GIDs
 	ok := sm.handleRequest(op)
@@ -193,7 +198,7 @@ func (sm *ShardMaster) Move(args *MoveArgs, reply *MoveReply) {
 }
 
 func (sm *ShardMaster) Query(args *QueryArgs, reply *QueryReply) {
-	// log.Printf("Shard master got query request %v", args)
+	// // log.Printf("Shard master got query request %v", args)
 	op := Op{args.ClientID, args.Serial, QUERY, map[int][]string{}, []int{}, -1, -1, -1}
 	op.QueryConfigNum = args.Num
 	ok := sm.handleRequest(op)
@@ -236,7 +241,7 @@ func (sm *ShardMaster) apply(op Op) {
 	}
 	config.Num, config.Shards, config.Groups = configNum, newShards, newGroups
 	sm.config = append(sm.config, config)
-	// log.Printf("Shard Master got new config, op %v, config %v", op.Type, config)
+	// // log.Printf("Shard Master got new config, op %v, config %v", op.Type, config)
 }
 
 // listening sm.applyCh for committed logs from raft
@@ -259,23 +264,27 @@ func (sm *ShardMaster) applyCommitted() {
 
 		// execute op if it's putappend, let the handler execute get, because it's harder to put err no key back to hander
 		sm.mu.Lock()
-		if serial, present := sm.clientReqs[op.ClientID]; !present || op.Serial > serial {
+		if serial, present := sm.clientReqs[op.ClientID]; op.Type == QUERY || !present || op.Serial > serial {
 			sm.apply(op)
 			sm.clientReqs[op.ClientID] = op.Serial
+		} else {
+			sm.mu.Unlock()
+
+			continue
 		}
 
 		opChan, present := sm.opChans[index]
-		if !present {
-			opChan = make(chan interface{}, 1)
-			sm.opChans[index] = opChan
+		// if !present {
+		// 	opChan = make(chan interface{}, 1)
+		// 	sm.opChans[index] = opChan
+		// }
+		sm.mu.Unlock()
+
+		if present {
+			opChan <- op
 		}
 
-		// if present {
-		opChan <- op
-		// }
-
 		// if not present it means no handlers waiting on that index
-		sm.mu.Unlock()
 
 	}
 }
@@ -315,7 +324,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister)
 
 	labgob.Register(Op{})
 	sm.applyCh = make(chan raft.ApplyMsg)
-	sm.rf = raft.Make(servers, me, -1, persister, sm.applyCh)
+	sm.rf = raft.Make(servers, me, persister, sm.applyCh)
 
 	sm.opChans = make(map[int]chan interface{})
 	sm.clientReqs = make(map[int64]int64)
