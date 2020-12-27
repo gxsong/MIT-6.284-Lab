@@ -35,6 +35,14 @@ const (
 	ReceiveShard OpType = "ReceiveShard"
 )
 
+type ShardState string
+
+const (
+	VALID   ShardState = "VALID"
+	PENDING ShardState = "PENDING"
+	INVALID ShardState = "INVALID"
+)
+
 type Op struct {
 	// Put/Append/Get Op fields:
 	ClientID int64
@@ -47,16 +55,51 @@ type Op struct {
 	ConfigNum int
 	Config    shardmaster.Config
 	// SendShard Op fields:
-	DestGID        int
-	MovingShardNum int
+	DestGID         int
+	MovingShardNums []int
 	// ReceiveShard Op fields:
-	MovingShardDB         DB
-	MovingShardClientReqs map[int64]int64
+	MovingShardDBs        map[int]DB
+	MovingShardClientReqs map[int]ClientReqLog
 }
 
 func (op *Op) equal(other interface{}) bool {
 	otherOp := other.(Op)
-	return op.ClientID == otherOp.ClientID && op.Serial == otherOp.Serial && op.ConfigNum == otherOp.ConfigNum && op.MovingShardNum == otherOp.MovingShardNum
+	return op.ClientID == otherOp.ClientID && op.Serial == otherOp.Serial && op.ConfigNum == otherOp.ConfigNum
+}
+
+func (op *Op) copy() Op {
+	opCopy := Op{}
+	opCopy.ClientID,
+		opCopy.Serial,
+		opCopy.Type,
+		opCopy.Shard,
+		opCopy.Key,
+		opCopy.Value,
+		opCopy.ConfigNum,
+		opCopy.Config,
+		opCopy.DestGID,
+		opCopy.MovingShardNums,
+		opCopy.MovingShardDBs,
+		opCopy.MovingShardClientReqs = op.ClientID,
+		op.Serial,
+		op.Type,
+		op.Shard,
+		op.Key,
+		op.Value,
+		op.ConfigNum,
+		copyConfig(op.Config),
+		op.DestGID,
+		append(opCopy.MovingShardNums, op.MovingShardNums...),
+		map[int]DB{},
+		map[int]ClientReqLog{}
+
+	for shard, DB := range op.MovingShardDBs {
+		opCopy.MovingShardDBs[shard] = copyDBShard(DB)
+	}
+	for shard, clientReqs := range op.MovingShardClientReqs {
+		opCopy.MovingShardClientReqs[shard] = copyClientReqShard(clientReqs)
+	}
+	return opCopy
 }
 
 // Put or Append
@@ -91,9 +134,9 @@ type MoveShardArgs struct {
 	FromGID         int
 	ToGID           int
 	ConfigNum       int
-	ShardNum        int
-	ShardDB         DB
-	ShardClientReqs map[int64]int64
+	ShardNums       []int
+	ShardDBs        map[int]DB
+	ShardClientReqs map[int]ClientReqLog
 }
 
 type MoveShardReply struct {
@@ -102,4 +145,4 @@ type MoveShardReply struct {
 
 type DB map[string]string
 type ClientReqLog map[int64]int64
-type GroupReqLog map[int]map[int]bool
+type GroupReqLog map[int]bool

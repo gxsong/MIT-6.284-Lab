@@ -265,10 +265,14 @@ func (sm *ShardMaster) applyCommitted() {
 		}
 
 		opChan, present := sm.opChans[index]
-
-		if present {
-			opChan <- op
+		if !present {
+			opChan = make(chan interface{}, 1)
+			sm.opChans[index] = opChan
 		}
+
+		// if present {
+		opChan <- op
+		// }
 
 		// if not present it means no handlers waiting on that index
 		sm.mu.Unlock()
@@ -311,7 +315,7 @@ func StartServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persister)
 
 	labgob.Register(Op{})
 	sm.applyCh = make(chan raft.ApplyMsg)
-	sm.rf = raft.Make(servers, me, persister, sm.applyCh)
+	sm.rf = raft.Make(servers, me, -1, persister, sm.applyCh)
 
 	sm.opChans = make(map[int]chan interface{})
 	sm.clientReqs = make(map[int64]int64)

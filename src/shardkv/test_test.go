@@ -18,10 +18,12 @@ import (
 const linearizabilityCheckTimeout = 1 * time.Second
 
 func check(t *testing.T, ck *Clerk, key string, value string) {
+	log.Printf("Getting %s -> %s", key, value)
 	v := ck.Get(key)
 	if v != value {
 		t.Fatalf("Get(%v): expected:\n%v\nreceived:\n%v", key, value, v)
 	}
+	log.Printf("Successfully got %s -> %s", key, value)
 }
 
 //
@@ -73,7 +75,7 @@ func TestStaticShards(t *testing.T) {
 		select {
 		case <-ch:
 			ndone += 1
-		case <-time.After(time.Second * 2):
+		case <-time.After(time.Second * 5):
 			done = true
 			break
 		}
@@ -102,6 +104,7 @@ func TestJoinLeave(t *testing.T) {
 	ck := cfg.makeClient()
 
 	cfg.join(0)
+	log.Printf("[test] joined 0")
 
 	n := 10
 	ka := make([]string, n)
@@ -116,6 +119,7 @@ func TestJoinLeave(t *testing.T) {
 	}
 
 	cfg.join(1)
+	log.Printf("[test] joined 1")
 
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
@@ -125,6 +129,7 @@ func TestJoinLeave(t *testing.T) {
 	}
 
 	cfg.leave(0)
+	log.Printf("[test] left 0")
 
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
@@ -138,6 +143,7 @@ func TestJoinLeave(t *testing.T) {
 
 	cfg.checklogs()
 	cfg.ShutdownGroup(0)
+	log.Printf("[test] shutting down 0")
 
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])
@@ -309,6 +315,7 @@ func TestConcurrent1(t *testing.T) {
 	ck := cfg.makeClient()
 
 	cfg.join(0)
+	log.Printf("[test] join 0")
 
 	n := 10
 	ka := make([]string, n)
@@ -318,6 +325,7 @@ func TestConcurrent1(t *testing.T) {
 		va[i] = randstring(5)
 		ck.Put(ka[i], va[i])
 	}
+	log.Printf("[test] put multiple shards")
 
 	var done int32
 	ch := make(chan bool)
@@ -337,38 +345,48 @@ func TestConcurrent1(t *testing.T) {
 		go ff(i)
 	}
 
+	log.Printf("[test] concurrently append multiple shards")
+
 	time.Sleep(150 * time.Millisecond)
 	cfg.join(1)
+	log.Printf("[test] join 1")
 	time.Sleep(500 * time.Millisecond)
 	cfg.join(2)
+	log.Printf("[test] join 2")
 	time.Sleep(500 * time.Millisecond)
 	cfg.leave(0)
+	log.Printf("[test] leave 0")
 
 	cfg.ShutdownGroup(0)
 	time.Sleep(100 * time.Millisecond)
 	cfg.ShutdownGroup(1)
 	time.Sleep(100 * time.Millisecond)
 	cfg.ShutdownGroup(2)
+	log.Printf("[test] shut down 0 1 2")
 
 	cfg.leave(2)
+	log.Printf("[test] leave 2")
 
 	time.Sleep(100 * time.Millisecond)
 	cfg.StartGroup(0)
 	cfg.StartGroup(1)
 	cfg.StartGroup(2)
+	log.Printf("[test] start 0 1 2")
 
 	time.Sleep(100 * time.Millisecond)
 	cfg.join(0)
 	cfg.leave(1)
 	time.Sleep(500 * time.Millisecond)
 	cfg.join(1)
-
+	log.Printf("[test] join 0, leave then join 1")
 	time.Sleep(1 * time.Second)
 
 	atomic.StoreInt32(&done, 1)
 	for i := 0; i < n; i++ {
 		<-ch
+		log.Printf("[test] ch recv %d", i)
 	}
+	log.Printf("[test] done concurrently append multiple shards")
 
 	for i := 0; i < n; i++ {
 		check(t, ck, ka[i], va[i])

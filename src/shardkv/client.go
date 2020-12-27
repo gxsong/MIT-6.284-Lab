@@ -10,7 +10,6 @@ package shardkv
 
 import (
 	"crypto/rand"
-	"log"
 	"math/big"
 	"time"
 
@@ -61,7 +60,7 @@ func MakeClerk(masters []*labrpc.ClientEnd, make_end func(string) *labrpc.Client
 	ck := new(Clerk)
 	ck.sm = shardmaster.MakeClerk(masters)
 	ck.make_end = make_end
-	// You'll have to add code here.
+	ck.clientID = nrand()
 	return ck
 }
 
@@ -83,17 +82,20 @@ func (ck *Clerk) Get(key string) string {
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
 				var reply GetReply
+				// log.Printf("Client %d Serial %d sending GET request %v", ck.clientID, ck.serial, args)
 				ok := srv.Call("ShardKV.Get", &args, &reply)
+				// log.Printf("Client %d Serial %d got GET reply %v, ok: %t", ck.clientID, ck.serial, reply, ok)
 				if ok && (reply.Err == OK || reply.Err == ErrNoKey) {
 					return reply.Value
 				}
 				if ok && (reply.Err == ErrWrongGroup) {
 					break
 				}
+
 				// ... not ok, or ErrWrongLeader
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		// ask master for the latest configuration.
 		ck.config = ck.sm.Query(-1)
 	}
@@ -114,8 +116,9 @@ func (ck *Clerk) PutAppend(key string, value string, op OpType) {
 			for si := 0; si < len(servers); si++ {
 				srv := ck.make_end(servers[si])
 				var reply PutAppendReply
+				// log.Printf("Client %d Serial %d sending PUTAPPEND request %v", ck.clientID, ck.serial, args)
 				ok := srv.Call("ShardKV.PutAppend", &args, &reply)
-				log.Printf("%s, %d, %d, Request got err %s", servers[si], ck.clientID, ck.serial, reply.Err)
+				// log.Printf("Client %d Serial %d got PUTAPPEND reply %v", ck.clientID, ck.serial, reply)
 				if ok && reply.Err == OK {
 					return
 				}
@@ -125,7 +128,7 @@ func (ck *Clerk) PutAppend(key string, value string, op OpType) {
 				// ... not ok, or ErrWrongLeader
 			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		// ask master for the latest configuration.
 		ck.config = ck.sm.Query(-1)
 	}
